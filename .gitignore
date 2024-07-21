@@ -1,0 +1,10 @@
+# Byte-compiled / optimized / DLL files
+pyvenv.cfg
+venv
+__pycache__
+
+# Mac stuff
+.DS_Store
+
+# For the moment ignore PureData files
+*.pd

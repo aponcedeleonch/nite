@@ -1,0 +1,27 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pdpy"
+version = "0.0.1"
+dependencies = [
+    "click==8.1.7",
+]
+requires-python = ">=3.12"
+authors = [
+  {name = "Alejandro Ponce de León Chávez", email = "aponcedeleonch@gmail.com"},
+]
+description = ""
+readme = "README.md"
+license = {file = "LICENSE"}
+keywords = ["puredata"]
+classifiers = [
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3",
+  "Operating System :: OS Independent"
+]
+
+[project.urls]
+Homepage = "https://github.com/aponcedeleonch/pdpy"
+Issues = "https://github.com/aponcedeleonch/pdpy/issues"
