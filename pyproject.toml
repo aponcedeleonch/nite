@@ -7,6 +7,7 @@ name = "pdpy"
 version = "0.0.1"
 dependencies = [
     "click==8.1.7",
+    "networkx==3.3"
 ]
 requires-python = ">=3.12"
 authors = [
