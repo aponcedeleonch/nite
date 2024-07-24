@@ -13,10 +13,10 @@ clean:
 
 start:
 	source ./${VENV}/bin/activate; \
-	cd src/web; \
+	cd web; \
 	flask run --host=0.0.0.0
 
 start-dev:
 	source ./${VENV}/bin/activate; \
-	cd src/web; \
+	cd web; \
 	flask run --host=0.0.0.0 --debug

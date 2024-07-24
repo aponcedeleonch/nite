@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <title>Edit Image</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css">
+    <style>
+        .option {
+            background-color: peachpuff;
+            color: black;
+            border-radius: 20px;
+            padding: 10px 20px;
+            text-align: center;
+            margin: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .option.selected {
+            background-color: purple;
+            color: white;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+    <script>
+        function selectMidi(midiNumber) {
+            // Deselect all MIDIs
+            var allMidis = document.querySelectorAll('.option');
+            allMidis.forEach(function(midi) {
+                midi.classList.remove('selected');
+            });
+
+            // Hide all options
+            var allOptions = document.querySelectorAll('.midi-options');
+            allOptions.forEach(function(option) {
+                option.classList.add('hidden');
+            });
+
+            // Select clicked MIDI and show its options
+            var selectedMidi = document.getElementById('midi-' + midiNumber);
+            selectedMidi.classList.add('selected');
+            var selectedOptions = document.getElementById('midi-' + midiNumber + '-options');
+            selectedOptions.classList.remove('hidden');
+        }
+    </script>
+</head>
+<body>
+    <div class="container">
+        <h1 id="filename" class="text-center my-4">{{ nite_env.name }}</h1>
+        <div class="row">
+            <div class="col">
+                {% for midi in nite_env.midis %}
+                    <div id="midi-{{ loop.index }}" class="option" onclick="this.classList.toggle('selected'); selectMidi({{ loop.index }});">MIDI {{ loop.index }}</div>
+                {% endfor %}
+            </div>
+            <div class="col-6 text-center">
+                <img id="image" alt="Image to edit" class="img-fluid">
+            </div>
+            <div class="col">
+                {% for midi in nite_env.midis %}
+                    <div id="midi-{{ loop.index }}-options" class="midi-options hidden">
+                        <div class="option" onclick="this.classList.toggle('selected')">Shape <span>{{ midi.shape }}</span></div>
+                        <div class="option" onclick="this.classList.toggle('selected')">Color <span>{{ midi.color_rgb }}</span></div>
+                        <div class="option" onclick="this.classList.toggle('selected')">Number of Particles <span>{{ midi.number_of_particles }}</span></div>
+                        <div class="option" onclick="this.classList.toggle('selected')">Orbit <span>{{ midi.orbitpoint }}</span></div>
+                        <div class="option" onclick="this.classList.toggle('selected')">Velocity <span></span>{{ midi.velocity }}</div>
+                        <div class="option" onclick="this.classList.toggle('selected')">Kill Time (frames) <span>{{ midi.killold }}</span></div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</body>
+</html>
