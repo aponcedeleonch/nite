@@ -4,28 +4,28 @@ from pydantic import BaseModel
 
 
 class ColorRgb(BaseModel):
-    r: float
-    g: float
-    b: float
+    r: Optional[float] = None
+    g: Optional[float] = None
+    b: Optional[float] = None
 
 
 class PointOrDirection(BaseModel):
-    x: float = 0.0
-    y: float = 0.0
-    z: float = 0.0
+    x: Optional[float] = None
+    y: Optional[float] = None
+    z: Optional[float] = None
 
 
 class OrbitPoint(BaseModel):
-    point: PointOrDirection
-    force: float
+    point: PointOrDirection = PointOrDirection()
+    force: Optional[float] = None
 
 
 class ParticleSysytem(BaseModel):
     shape: Optional[str] = None
-    color_rgb: Optional[ColorRgb] = None
+    color_rgb: ColorRgb = ColorRgb()
     number_of_particles: Optional[int] = None
-    orbitpoint: Optional[OrbitPoint] = None
-    velocity: Optional[PointOrDirection] = None
+    orbitpoint: OrbitPoint = OrbitPoint()
+    velocity: PointOrDirection = PointOrDirection()
     killold: Optional[int] = None
 
 
