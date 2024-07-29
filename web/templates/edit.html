@@ -4,7 +4,7 @@
     <title>Edit Image</title>
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css">
     <style>
-        .option {
+        .midi {
             background-color: peachpuff;
             color: black;
             border-radius: 20px;
@@ -14,14 +14,25 @@
             cursor: pointer;
             transition: all 0.3s ease;
         }
-        .option.selected {
+        .midi.selected {
             background-color: purple;
             color: white;
         }
+
         .hidden {
             display: none;
         }
-        .dropdown {
+
+        .midi-param {
+            background-color: peachpuff;
+            color: black;
+            border-radius: 20px;
+            padding: 10px 20px;
+            text-align: center;
+            margin: 5px;
+        }
+    
+        .midi-val {
             background-color: #f8f9fa; /* Light gray */
             color: #343a40; /* Dark gray */
             border: 1px solid #ced4da; /* Gray border */
@@ -35,82 +46,42 @@
             font-size: 0.875rem; /* Font size */
         }
 
-        .dropdown:hover {
+        .midi-val:hover {
             background-color: #e9ecef; /* Lighter gray on hover */
         }
 
-        .dropdown div {
+        .midi-val div {
             padding: 0.25rem 0; /* Padding for options */
         }
 
-        .dropdown div:hover {
+        .midi-val div:hover {
             background-color: #dae0e5; /* Even lighter gray for option hover */
-        }
-
-
-        .preview {
-            color: #008080;
-            display: block;
         }
     </style>
     <script>
         // Select the first MIDI by default
         window.onload = function() {
-            selectMidi(1);
+            select_midi(1);
         }
 
-        function selectMidi(midiNumber) {
+        function select_midi(midi_number) {
             // Deselect all MIDIs
-            var allMidis = document.querySelectorAll('.option');
-            allMidis.forEach(function(midi) {
+            var midis = document.querySelectorAll('.midi');
+            midis.forEach(function(midi) {
                 midi.classList.remove('selected');
             });
 
             // Hide all options
-            var allOptions = document.querySelectorAll('.midi-options');
-            allOptions.forEach(function(option) {
-                option.classList.add('hidden');
+            var midi_params = document.querySelectorAll('.midi-params');
+            midi_params.forEach(function(midi_param) {
+                midi_param.classList.add('hidden');
             });
-
-            remove_selected_options();
-            hide_option_values();
 
             // Select clicked MIDI and show its options
-            var selectedMidi = document.getElementById('midi-' + midiNumber);
-            selectedMidi.classList.add('selected');
-            var selectedOptions = document.getElementById('midi-' + midiNumber + '-options');
-            selectedOptions.classList.remove('hidden');
-        }
-
-        function hide_option_values(){
-            var option_values = document.querySelectorAll('.option-val');
-            option_values.forEach(function(option_val) {
-                option_val.classList.add('hidden');
-            });
-        }
-
-        function remove_selected_options(){
-            var option_params = document.querySelectorAll('.option-param');
-            option_params.forEach(function(option_param) {
-                option_param.classList.remove('selected');
-            });
-        }
-
-        function toggle_option_value(option_value_id) {
-            // Hide all option value
-            hide_option_values();
-
-            // Show clicked dropdown
-            var option_value = document.getElementById(option_value_id);
-            option_value.classList.remove('hidden');
-        }
-
-        function select_option_param(option_id){
-            remove_selected_options();
-            var option_param = document.getElementById(option_id + '-param');
-            option_param.classList.add('selected');
-
-            toggle_option_value(option_id + '-val');
+            var selected_midi = document.getElementById('midi-' + midi_number);
+            selected_midi.classList.add('selected');
+            var selected_params = document.getElementById('midi-' + midi_number + '-params');
+            selected_params.classList.remove('hidden');
         }
     </script>
 </head>
@@ -120,64 +91,76 @@
         <div class="row">
             <div class="col">
                 {% for midi in nite_env.midis %}
-                    <div id="midi-{{ loop.index }}" class="option" onclick="selectMidi({{ loop.index }});">MIDI {{ loop.index }}</div>
+                    <div id="midi-{{ loop.index }}" class="midi" onclick="select_midi({{ loop.index }});">MIDI {{ loop.index }}</div>
                 {% endfor %}
             </div>
             <div class="col-6 text-center">
                 <img id="image" alt="Image to edit" class="img-fluid">
             </div>
             <div class="col">
-                {% for midi in nite_env.midis %}
-                    <div id="midi-{{ loop.index }}-options" class="midi-options hidden">
-                        <!-- Shape -->
-                        <div id="shape-midi-{{ loop.index }}-param" class="option option-param" onclick="select_option_param('shape-midi-{{ loop.index }}');">Shape<span class="preview">{{ midi.shape }}</span></div>
-                        <div id="shape-midi-{{ loop.index }}-val" class="option-val dropdown hidden">
-                            <select>
-                                <option>-- Please select somthing --</option>
-                                <option value="circle">Circle</option>
-                                <option value="square">Square</option>
-                                <option value="triangle">Triangle</option>
-                            </select>
-                        </div>
+                <form id="midi-form" method="POST" action="/save">
+                    <input type="hidden" name="nite_env_name" value="{{ nite_env.name }}">
+                    {% for midi in nite_env.midis %}
+                        <div id="midi-{{ loop.index }}-params" class="midi-params hidden">
+                            <!-- Shape -->
+                            <div id="{{ shape_name }}-midi-{{ loop.index }}-param" class="midi-param">Shape</div>
+                            <div id="{{ shape_name }}-midi-{{ loop.index }}-val" class="midi-val">
+                                <select id="{{ shape_name }}-{{ loop.index }}" name="shape-{{ loop.index }}">
+                                    <option value="">-- Please select something --</option>
+                                    <option value="point">Point</option>
+                                    <option value="line">Line</option>
+                                    <option value="triangle">Triangle</option>
+                                    <option value="plane">Plane</option>
+                                    <option value="box">Box</option>
+                                    <option value="sphere">Sphere</option>
+                                    <option value="cylinder">Cylinder</option>
+                                    <option value="cone">Cone</option>
+                                    <option value="blob">Blob</option>
+                                    <option value="disc">Disc</option>
+                                    <option value="rectangle">Rectangle</option>
+                                </select>
+                            </div>
 
-                        <!-- Color -->
-                        <div id="color-midi-{{ loop.index }}-param" class="option option-param" onclick="select_option_param('color-midi-{{ loop.index }}');">Color <span class="preview">{{ midi.color_rgb }}</span></div>
-                        <div id="color-midi-{{ loop.index }}-val" class="option-val dropdown hidden">
-                            <input type="text" id="color-midi-{{ loop.index }}-r-val" placeholder="R value" value="{{ midi.color_rgb.r|default('', true) }}">
-                            <input type="text" id="color-midi-{{ loop.index }}-g-val" placeholder="G value" value="{{ midi.color_rgb.g|default('', true) }}">
-                            <input type="text" id="color-midi-{{ loop.index }}-b-val" placeholder="B value" value="{{ midi.color_rgb.b|default('', true) }}">
-                        </div>
+                            <!-- Color -->
+                            <div id="{{ color_name }}-midi-{{ loop.index }}-param" class="midi-param">Color </div>
+                            <div id="{{ color_name }}-midi-{{ loop.index }}-val" class="midi-val">
+                                <input type="text" id="{{ color_name }}-{{ loop.index }}-r" name="{{ color_name }}-{{ loop.index }}-r" placeholder="R value" value="{{ midi.color_rgb.r|default('', true) }}">
+                                <input type="text" id="{{ color_name }}-{{ loop.index }}-g" name="{{ color_name }}-{{ loop.index }}-g" placeholder="G value" value="{{ midi.color_rgb.g|default('', true) }}">
+                                <input type="text" id="{{ color_name }}-{{ loop.index }}-b" name="{{ color_name }}-{{ loop.index }}-b" placeholder="B value" value="{{ midi.color_rgb.b|default('', true) }}">
+                            </div>
 
-                        <!-- Number of particles -->
-                        <div id="no_particles-midi-{{ loop.index }}-param" class="option option-param" onclick="select_option_param('no_particles-midi-{{ loop.index }}');">Number of Particles<span class="preview">{{ midi.number_of_particles }}</span></div>
-                        <div id="no_particles-midi-{{ loop.index }}-val" class="option-val dropdown hidden">
-                            <input type="text" id="no_particle-midi-{{ loop.index }}-val" placeholder="Number of particles" value="{{ midi.number_of_particles|default('', true) }}">
-                        </div>
+                            <!-- Number of particles -->
+                            <div id="{{ number_of_particles_name }}-midi-{{ loop.index }}-param" class="midi-param">Number of Particles</div>
+                            <div id="{{ number_of_particles_name }}-midi-{{ loop.index }}-val" class="midi-val">
+                                <input type="text" id="{{ number_of_particles_name }}-{{ loop.index }}" name="{{ number_of_particles_name }}-{{ loop.index }}" placeholder="Number of particles" value="{{ midi.number_of_particles|default('', true) }}">
+                            </div>
 
-                        <!-- Orbit Point -->
-                        <div id="orbit-midi-{{ loop.index }}-param" class="option option-param" onclick="select_option_param('orbit-midi-{{ loop.index }}');">Orbit<span class="preview">{{ midi.orbitpoint }}</span></div>
-                        <div id="orbit-midi-{{ loop.index }}-val" class="option-val dropdown hidden">
-                            <input type="text" id="orbit-midi-{{ loop.index }}-x-val" placeholder="X value" value="{{ midi.orbitpoint.point.x|default('', true) }}">
-                            <input type="text" id="orbit-midi-{{ loop.index }}-y-val" placeholder="Y value" value="{{ midi.orbitpoint.point.y|default('', true) }}">
-                            <input type="text" id="orbit-midi-{{ loop.index }}-z-val" placeholder="Z value" value="{{ midi.orbitpoint.point.z|default('', true) }}">
-                            <input type="text" id="orbit-midi-{{ loop.index }}-vel-val" placeholder="Velocity value" value="{{ midi.orbitpoint.force|default('', true) }}">
-                        </div>
+                            <!-- Orbit Point -->
+                            <div id="{{ orbitpoint_name }}-midi-{{ loop.index }}-param" class="midi-param">Orbit</div>
+                            <div id="{{ orbitpoint_name }}-midi-{{ loop.index }}-val" class="midi-val">
+                                <input type="text" id="{{ orbitpoint_name }}-{{ loop.index }}-x" name="{{ orbitpoint_name }}-{{ loop.index }}-x" placeholder="X value" value="{{ midi.orbitpoint.point.x|default('', true) }}">
+                                <input type="text" id="{{ orbitpoint_name }}-{{ loop.index }}-y" name="{{ orbitpoint_name }}-{{ loop.index }}-y" placeholder="Y value" value="{{ midi.orbitpoint.point.y|default('', true) }}">
+                                <input type="text" id="{{ orbitpoint_name }}-{{ loop.index }}-z" name="{{ orbitpoint_name }}-{{ loop.index }}-z" placeholder="Z value" value="{{ midi.orbitpoint.point.z|default('', true) }}">
+                                <input type="text" id="{{ orbitpoint_name }}-{{ loop.index }}-force" name="{{ orbitpoint_name }}-{{ loop.index }}-force" placeholder="Velocity value" value="{{ midi.orbitpoint.force|default('', true) }}">
+                            </div>
 
-                        <!-- Velocity -->
-                        <div id="velocity-midi-{{ loop.index }}-param" class="option option-param" onclick="select_option_param('velocity-midi-{{ loop.index }}');">Velocity<span class="preview">{{ midi.velocity }}</span></div>
-                        <div id="velocity-midi-{{ loop.index }}-val" class="option-val dropdown hidden">
-                            <input type="text" id="velocity-midi-{{ loop.index }}-x-val" placeholder="X value" value="{{ midi.velocity.x|default('', true) }}">
-                            <input type="text" id="velocity-midi-{{ loop.index }}-y-val" placeholder="Y value" value="{{ midi.velocity.y|default('', true) }}">
-                            <input type="text" id="velocity-midi-{{ loop.index }}-z-val" placeholder="Z value" value="{{ midi.velocity.z|default('', true) }}">
-                        </div>
+                            <!-- Velocity -->
+                            <div id="{{ velocity_name }}-midi-{{ loop.index }}-param" class="midi-param">Velocity</div>
+                            <div id="{{ velocity_name }}-midi-{{ loop.index }}-val" class="midi-val">
+                                <input type="text" id="{{ velocity_name }}-{{ loop.index }}-x" name="{{ velocity_name }}-{{ loop.index }}-x" placeholder="X value" value="{{ midi.velocity.x|default('', true) }}">
+                                <input type="text" id="{{ velocity_name }}-{{ loop.index }}-y" name="{{ velocity_name }}-{{ loop.index }}-y" placeholder="Y value" value="{{ midi.velocity.y|default('', true) }}">
+                                <input type="text" id="{{ velocity_name }}-{{ loop.index }}-z" name="{{ velocity_name }}-{{ loop.index }}-z" placeholder="Z value" value="{{ midi.velocity.z|default('', true) }}">
+                            </div>
 
-                        <!-- Kill time -->
-                        <div id="killold-midi-{{ loop.index }}-param" class="option option-param" onclick="select_option_param('killold-midi-{{ loop.index }}');">Kill Time (frames)<span class="preview">{{ midi.killold }}</span></div>
-                        <div id="killold-midi-{{ loop.index }}-val" class="option-val dropdown hidden">
-                            <input type="text" id="killold-midi-{{ loop.index }}-val" placeholder="Kill Time" value="{{ midi.killold|default('', true) }}">
+                            <!-- Kill time -->
+                            <div id="{{ killold_name }}-midi-{{ loop.index }}-param" class="midi-param">Kill Time (frames)</div>
+                            <div id="{{ killold_name }}-midi-{{ loop.index }}-val" class="midi-val">
+                                <input type="text" id="{{ killold_name }}-{{ loop.index }}" name="{{ killold_name }}-{{ loop.index }}" placeholder="Kill Time" value="{{ midi.killold|default('', true) }}">
+                            </div>
                         </div>
-                    </div>
-                {% endfor %}
+                    {% endfor %}
+                <button type="submit" class="btn btn-primary">Save</button>
+                </form>
             </div>
         </div>
     </div>

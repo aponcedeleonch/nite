@@ -11,7 +11,32 @@ logger = logging.getLogger(__name__)
 
 class PdObject(ABC):
 
+    def __init__(self):
+        pass
+
+    @property
+    @abstractmethod
+    def str_id(self) -> str:
+        pass
+
+    @abstractmethod
+    def __str__(self) -> str:
+        pass
+
+    def _common_process_line(self, line: str) -> List:
+        line = clean_pd_str(line)
+        obj_str_elems = line.split(' ')
+        return obj_str_elems[2:]
+
+    @abstractmethod
+    def read_line(self, line: str) -> None:
+        pass
+
+
+class PdPositionObject(PdObject):
+
     def __init__(self, x: Optional[int] = None, y: Optional[int] = None):
+        super().__init__()
         self.x = x or 10
         self.y = y or 10
 
@@ -24,20 +49,18 @@ class PdObject(ABC):
     def __str__(self) -> str:
         pass
 
-
     def _common_process_line(self, line: str) -> List:
-        line = clean_pd_str(line)
-        obj_str_part = line.split(' ')
-        self.x = transform_str_to_int(obj_str_part[2])
-        self.y = transform_str_to_int(obj_str_part[3])
-        return obj_str_part[4:]
+        obj_str_elems = super()._common_process_line(line)
+        self.x = transform_str_to_int(obj_str_elems[0])
+        self.y = transform_str_to_int(obj_str_elems[1])
+        return obj_str_elems[2:]
 
     @abstractmethod
     def read_line(self, line: str) -> None:
         pass
 
 
-class Message(PdObject):
+class Message(PdPositionObject):
 
     def __init__(self, x: Optional[int] = None, y: Optional[int] = None, msg: Optional[str] = None):
         super().__init__(x, y)
@@ -54,11 +77,11 @@ class Message(PdObject):
         self.msg = clean_pd_str(msg)
     
     def read_line(self, line: str) -> None:
-        obj_list = super()._common_process_line(line)
-        self._set_msg(' '.join(obj_list))
+        obj_str_elems = super()._common_process_line(line)
+        self._set_msg(' '.join(obj_str_elems))
 
 
-class ObjBox(PdObject):
+class ObjBox(PdPositionObject):
 
     def __init__(self, x: Optional[int] = None, y: Optional[int] = None, obj_args: Optional[List] = None):
         super().__init__(x, y)
@@ -72,13 +95,31 @@ class ObjBox(PdObject):
         return f"{self.str_id} {self.x} {self.y} {' '.join(self.obj_args)};\n"
     
     def read_line(self, line: str) -> None:
-        obj_list = super()._common_process_line(line)
-        self.obj_args = obj_list
+        self.obj_args = super()._common_process_line(line)
+
+
+class DeclareLib(PdObject):
+
+    def __init__(self, lib_name: Optional[str] = None):
+        super().__init__()
+        self.lib_name = lib_name
+    
+    @property
+    def str_id(self) -> str:
+        return '#X declare'
+
+    def __str__(self) -> str:
+        return f"{self.str_id} -lib {self.lib_name};\n"
+
+    def read_line(self, line: str) -> None:
+        obj_str_elems = super()._common_process_line(line)
+        self.lib_name = obj_str_elems[1]
 
 
 pdobj_to_str = {
     Message: 'msg',
-    ObjBox: 'obj'
+    ObjBox: 'obj',
+    DeclareLib: 'declare'
 }
 
 str_to_pdobj = {str_rep: pdobj for pdobj, str_rep in pdobj_to_str.items()}

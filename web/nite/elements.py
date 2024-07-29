@@ -2,6 +2,8 @@ from typing import Optional, List
 
 from pydantic import BaseModel
 
+from .config import NUMBER_OF_MIDIS, DEFAULT_ENVIRONMENT_NAME
+
 
 class ColorRgb(BaseModel):
     r: Optional[float] = None
@@ -30,5 +32,5 @@ class ParticleSysytem(BaseModel):
 
 
 class NiteEnvironment(BaseModel):
-    name: str = 'New Nite Environment'
-    midis: List[ParticleSysytem] = [ParticleSysytem(), ParticleSysytem(), ParticleSysytem(), ParticleSysytem()]
+    name: str = DEFAULT_ENVIRONMENT_NAME
+    midis: List[ParticleSysytem] = [ParticleSysytem() for _ in range(NUMBER_OF_MIDIS)]
