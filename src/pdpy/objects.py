@@ -92,7 +92,8 @@ class ObjBox(PdPositionObject):
         return '#X obj'
 
     def __str__(self) -> str:
-        return f"{self.str_id} {self.x} {self.y} {' '.join(self.obj_args)};\n"
+        str_obj_args = ' '.join([str(arg) for arg in self.obj_args])
+        return f"{self.str_id} {self.x} {self.y} {str_obj_args};\n"
     
     def read_line(self, line: str) -> None:
         self.obj_args = super()._common_process_line(line)
