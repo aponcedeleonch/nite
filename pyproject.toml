@@ -3,12 +3,13 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "pdpy"
+name = "nite"
 version = "0.0.1"
 dependencies = [
   "networkx==3.3",
   "Flask==3.0.3",
-  "pydantic==2.8.2"
+  "pydantic==2.8.2",
+  "opencv-python==4.10.0.84"
 ]
 requires-python = ">=3.12"
 authors = [
@@ -25,5 +26,5 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/aponcedeleonch/pdpy"
-Issues = "https://github.com/aponcedeleonch/pdpy/issues"
+Homepage = "https://github.com/aponcedeleonch/nite"
+Issues = "https://github.com/aponcedeleonch/nite/issues"

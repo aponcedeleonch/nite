@@ -14,9 +14,9 @@ clean:
 start:
 	source ./${VENV}/bin/activate; \
 	cd web; \
-	flask run --host=0.0.0.0
+	flask run --host=0.0.0.0 --port=8531
 
 start-dev:
 	source ./${VENV}/bin/activate; \
 	cd web; \
-	flask run --host=0.0.0.0 --debug
+	flask run --host=0.0.0.0 --port=8531 --debug

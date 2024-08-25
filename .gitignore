@@ -8,3 +8,6 @@ __pycache__
 
 # For the moment ignore PureData files
 *.pd
+
+# Frame generated videos
+**/*nite_video/*
