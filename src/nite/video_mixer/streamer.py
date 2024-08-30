@@ -6,10 +6,11 @@ import cv2
 from pydantic import BaseModel
 
 from nite.config import TERMINATE_MESSAGE
-from nite.video_mixer import ProcessWithQueue
+from nite.logging import configure_module_logging
+from nite.video_mixer import ProcessWithQueue, CommQueues
 from nite.video_mixer.video import Video
 from nite.video_mixer.video_io import VideoReader
-from nite.logging import configure_module_logging
+from nite.video_mixer.audio_detecter import AudioDetecter
 
 LOGGING_NAME = 'nite.streamer'
 logger = configure_module_logging(LOGGING_NAME)
@@ -38,8 +39,8 @@ class VideoStreamer:
 
 class VideoCombiner(ProcessWithQueue):
 
-    def __init__(self, videos: List[Video], video_stream: VideoStream, queue: Queue):
-        super().__init__(queue=queue, sender_name='video_combiner')
+    def __init__(self, videos: List[Video], video_stream: VideoStream, queues: CommQueues):
+        super().__init__(queues=queues)
         self.videos = videos
         self.video_stream = video_stream
         self.ms_to_wait = self._calculate_ms_between_frames()
@@ -72,10 +73,14 @@ class VideoCombiner(ProcessWithQueue):
             if self.should_terminate(message):
                 break
 
+            if message:
+                frame = frames[0]
+            else:
+                frame = frames[1]
+
             if self.time_recorder.should_send_keepalive:
                 logger.info(f'Keep-alive. Elapsed time: {self.time_recorder.elapsed_time_str}')
 
-            frame = frames[0]
             cv2.imshow("frame combined", frame)
             cv2.waitKey(self.ms_to_wait)
         logger.info("Stream stopped")
@@ -83,7 +88,11 @@ class VideoCombiner(ProcessWithQueue):
 
 
 def main():
-    queue = Queue()
+    queue_to_audio = Queue()
+    queue_from_audio = Queue()
+
+    video_queues = CommQueues(in_queue=queue_from_audio, out_queue=queue_to_audio)
+    audio_queues = CommQueues(in_queue=queue_to_audio, out_queue=queue_from_audio)
 
     input_frames1 = '/Users/aponcedeleonch/Personal/nite/src/nite/video_mixer/bunny_video-nite_video'
     input_frames2 = '/Users/aponcedeleonch/Personal/nite/src/nite/video_mixer/can_video-nite_video'
@@ -91,14 +100,21 @@ def main():
     video2 = VideoReader().from_frames(input_frames2)
 
     video_stream = VideoStream(width=640, height=480)
-    combiner = VideoCombiner([video1, video2], video_stream, queue=queue)
+    combiner = VideoCombiner([video1, video2], video_stream, queues=video_queues)
+
+    audio = AudioDetecter(threshold=0.2, queues=audio_queues)
+
+    audio_process = Process(target=audio.start)
+    audio_process.start()
     stream_process = Process(target=combiner.stream)
     stream_process.start()
 
-    time.sleep(10)
-    terminate_msg = f'{{ "sender": "main", "receiver": "video_combiner", "message": "{TERMINATE_MESSAGE}" }}'
-    queue.put(terminate_msg)
+    time.sleep(60)
+
+    video_queues.in_queue.put({"content": TERMINATE_MESSAGE})
+    audio_queues.in_queue.put({"content": TERMINATE_MESSAGE})
     stream_process.join()
+    audio_process.join()
 
 
 if __name__ == "__main__":

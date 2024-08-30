@@ -7,9 +7,9 @@ import pyaudio
 import numpy as np
 
 from nite.config import AUDIO_SAMPLING_RATE, TERMINATE_MESSAGE
-from nite.video_mixer import ProcessWithQueue
-from nite.video_mixer.audio import short_format, AudioFormat
 from nite.logging import configure_module_logging
+from nite.video_mixer import ProcessWithQueue, CommQueues
+from nite.video_mixer.audio import AudioFormat, short_format
 
 
 LOGGING_NAME = 'nite.audio_detecter'
@@ -21,8 +21,8 @@ CHANNELS = 1 if sys.platform == 'darwin' else 2
 
 class AudioDetecter(ProcessWithQueue):
 
-    def __init__(self, audio_format: AudioFormat, threshold: float, queue: Queue):
-        super().__init__(queue=queue, sender_name='audio_detecter')
+    def __init__(self, threshold: float, queues: CommQueues, audio_format: AudioFormat = short_format):
+        super().__init__(queues=queues)
         self.audio_format = audio_format
         self.threshold = threshold
         logger.info(f'Loaded audio detecter. Threshold: {self.threshold}. Format: {self.audio_format}')
@@ -40,12 +40,12 @@ class AudioDetecter(ProcessWithQueue):
 
     def _do_action_on_threshold(self, audio_rms: float):
         if audio_rms > self.threshold:
-            logger.info('Threshold reached!')
+            self.send_message(f'Audio detected. RMS: {audio_rms}')
 
     def start(self) -> None:
         paud = pyaudio.PyAudio()
         stream = paud.open(
-                            format=short_format.pyaudio_format,
+                            format=self.audio_format.pyaudio_format,
                             channels=CHANNELS,
                             rate=AUDIO_SAMPLING_RATE,
                             input=True,
@@ -68,7 +68,7 @@ class AudioDetecter(ProcessWithQueue):
 
 def main():
     queue = Queue()
-    audio = AudioDetecter(audio_format=short_format, threshold=0.1, queue=queue)
+    audio = AudioDetecter(threshold=0.1, queue=queue)
     audio_process = Process(target=audio.start)
     audio_process.start()
 

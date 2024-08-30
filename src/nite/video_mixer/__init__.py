@@ -1,8 +1,8 @@
 import time
 from datetime import timedelta
-import json
 from multiprocessing import Queue
 from queue import Empty as QueueEmpty
+from dataclasses import dataclass
 
 from pydantic import BaseModel, computed_field
 
@@ -42,37 +42,38 @@ class TimeRecorder(BaseModel):
 
 
 class Message(BaseModel):
-    sender: str
-    receiver: str
-    message: str
+    content: str
+
+
+@dataclass
+class CommQueues:
+    in_queue: Queue
+    out_queue: Queue
 
 
 class ProcessWithQueue:
 
-    def __init__(self, queue: Queue, sender_name: str) -> None:
-        self.queue = queue
+    def __init__(self, queues: CommQueues) -> None:
+        self.queues = queues
         self.time_recorder = TimeRecorder(start_time=time.time())
-        self.sender_name = sender_name
 
     def _receive_from_queue(self) -> Message:
         try:
-            variable = self.queue.get(block=False)
+            variable = self.queues.in_queue.get(block=False)
             return variable
         except QueueEmpty:
             pass
 
-    def send_message(self, message: str, receiver_name: str) -> None:
-        message_obj = Message(sender=self.sender_name, receiver=receiver_name, message=message)
-        self.queue.put(message_obj.model_dump())
+    def send_message(self, message: str) -> None:
+        message_obj = Message(content=message)
+        self.queues.out_queue.put(message_obj.model_dump())
 
     def receive_message(self) -> str:
-        received_message_str = self._receive_from_queue()
-        if not received_message_str:
+        received_message = self._receive_from_queue()
+        if not received_message:
             return
-        received_message = json.loads(received_message_str)
         message_obj = Message(**received_message)
-        if message_obj.receiver == self.sender_name:
-            return message_obj.message
+        return message_obj.content
 
     def should_terminate(self, message: str) -> bool:
         if message and message == TERMINATE_MESSAGE:
