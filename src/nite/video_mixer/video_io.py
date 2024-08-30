@@ -1,37 +1,22 @@
-from typing import Optional, List
+from typing import Optional
 import time
 from pathlib import Path
-import logging
 from datetime import timedelta
 import json
 
 import cv2
-from pydantic import BaseModel
 
+from nite.video_mixer import Video, VideoMetadata
 from nite.config import METADATA_FILENAME, SUFFIX_NITE_VIDEO_FOLDER
+from nite.logging import configure_module_logging
 
 
-logger = logging.getLogger(__name__)
+LOGGING_NAME = 'nite.video_io'
+logger = configure_module_logging(LOGGING_NAME)
 
 
 def calculate_zero_padding(num_frames: int) -> int:
     return len(str(num_frames))
-
-
-class VideoMetadata(BaseModel):
-    name: str
-    num_frames: float
-    fps: float
-    extension: str = 'mp4'
-    width: int = 0
-    height: int = 0
-
-
-class Video:
-
-    def __init__(self, metadata: VideoMetadata, frames: List[cv2.typing.MatLike]) -> None:
-        self.metadata = metadata
-        self.frames = frames
 
 
 class VideoReader:
@@ -136,14 +121,12 @@ class VideoWriter:
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
     input_loc = '/Users/aponcedeleonch/Personal/bunny_video.mp4'
     video = VideoReader().from_video(input_loc)
     video_writer = VideoWriter(video, output_base_dir='/Users/aponcedeleonch/Personal/nite/src/nite/video')
     video_writer.to_frames()
 
-    input_frames = '/Users/aponcedeleonch/Personal/nite/src/nite/video/bunny_video-nite_video'
-    video = VideoReader().from_frames(input_frames)
-    video_writer = VideoWriter(video, output_base_dir='/Users/aponcedeleonch/Personal/nite/src/nite/video')
-    video_writer.to_video()
+    # input_frames = '/Users/aponcedeleonch/Personal/nite/src/nite/video/bunny_video-nite_video'
+    # video = VideoReader().from_frames(input_frames)
+    # video_writer = VideoWriter(video, output_base_dir='/Users/aponcedeleonch/Personal/nite/src/nite/video')
+    # video_writer.to_video()
