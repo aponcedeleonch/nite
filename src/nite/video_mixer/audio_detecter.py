@@ -1,15 +1,15 @@
 import sys
 import struct
 import time
-from datetime import timedelta
 from multiprocessing import Process, Queue
 
 import pyaudio
 import numpy as np
 
 from nite.config import AUDIO_SAMPLING_RATE, TERMINATE_MESSAGE
-from nite.video_mixer import short_format, AudioFormat, ProcessWithQueue
-from nite.logging import LogggingProcessConfig, configure_module_logging
+from nite.video_mixer import ProcessWithQueue
+from nite.video_mixer.audio import short_format, AudioFormat
+from nite.logging import configure_module_logging
 
 
 LOGGING_NAME = 'nite.audio_detecter'
@@ -21,11 +21,10 @@ CHANNELS = 1 if sys.platform == 'darwin' else 2
 
 class AudioDetecter(ProcessWithQueue):
 
-    def __init__(self, audio_format: AudioFormat, threshold: float, queue: Queue, logging_config: LogggingProcessConfig = None):
-        super().__init__(queue=queue)
+    def __init__(self, audio_format: AudioFormat, threshold: float, queue: Queue):
+        super().__init__(queue=queue, sender_name='audio_detecter')
         self.audio_format = audio_format
         self.threshold = threshold
-        self.logging_config = logging_config
         logger.info(f'Loaded audio detecter. Threshold: {self.threshold}. Format: {self.audio_format}')
 
     def _calculate_rms(self, audio_sample: np.ndarray) -> float:
@@ -54,22 +53,17 @@ class AudioDetecter(ProcessWithQueue):
                         )
 
         logger.info('Starting audio listening')
-        start_audio_time = time.time()
-        last_logged_time = 0
         while stream.is_active():
-            received_message = self.receive_from_queue()
-            if self.should_terminate(received_message):
+            message = self.receive_message()
+            if self.should_terminate(message):
                 break
-            elapsed_time = time.time() - start_audio_time
-            elapsed_seconds = int(elapsed_time)
-            if elapsed_seconds % 10 == 0 and elapsed_seconds > 0 and elapsed_seconds != last_logged_time:
-                logger.info(f'Keep-alive message audio. Elapsed time: {timedelta(seconds=elapsed_time)}')
-                last_logged_time = elapsed_seconds  # Update the last logged time
-        elapsed_audio_time = time.time() - start_audio_time
+
+            if self.time_recorder.should_send_keepalive:
+                logger.info(f'Keep-alive. Elapsed time: {self.time_recorder.elapsed_time_str}')
 
         stream.close()
         paud.terminate()
-        logger.info(f'Recording stopped. Elapsed time: {timedelta(seconds=elapsed_audio_time)}')
+        logger.info(f'Recording stopped. Elapsed time: {self.time_recorder.elapsed_time_str}')
 
 
 def main():
@@ -78,8 +72,9 @@ def main():
     audio_process = Process(target=audio.start)
     audio_process.start()
 
-    time.sleep(2)
-    queue.put(TERMINATE_MESSAGE)
+    time.sleep(15)
+    terminate_msg = f'{{ "sender": "main", "receiver": "audio_detecter", "message": "{TERMINATE_MESSAGE}" }}'
+    queue.put(terminate_msg)
     audio_process.join()
 
 

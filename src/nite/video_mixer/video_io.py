@@ -6,7 +6,7 @@ import json
 
 import cv2
 
-from nite.video_mixer import Video, VideoMetadata
+from nite.video_mixer.video import Video, VideoMetadata
 from nite.config import METADATA_FILENAME, SUFFIX_NITE_VIDEO_FOLDER
 from nite.logging import configure_module_logging
 
