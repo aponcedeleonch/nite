@@ -20,6 +20,7 @@ logger = configure_module_logging(LOGGING_NAME)
 class TimeRecorder(BaseModel):
     start_time: float
     last_logged_seconds: int = 0
+    period_timeout: int = KEEPALIVE_TIMEOUT
 
     @computed_field
     @property
@@ -38,8 +39,8 @@ class TimeRecorder(BaseModel):
 
     @computed_field
     @property
-    def should_send_keepalive(self) -> bool:
-        if self.elapsed_seconds % KEEPALIVE_TIMEOUT == 0 and self.elapsed_seconds != self.last_logged_seconds:
+    def has_period_passed(self) -> bool:
+        if self.elapsed_seconds % self.period_timeout == 0 and self.elapsed_seconds != self.last_logged_seconds:
             self.last_logged_seconds = self.elapsed_seconds
             return True
         return False

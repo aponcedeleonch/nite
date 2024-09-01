@@ -49,7 +49,7 @@ class AudioListener(ProcessWithQueue):
             if should_terminate:
                 break
 
-            if self.time_recorder.should_send_keepalive:
+            if self.time_recorder.has_period_passed:
                 logger.info(f'Keep-alive. Elapsed time: {self.time_recorder.elapsed_time_str}')
 
         stream.close()

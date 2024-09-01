@@ -11,7 +11,7 @@ from nite.video_mixer import ProcessWithQueue, CommQueues, Message
 from nite.video_mixer.video import Video
 from nite.video_mixer.video_io import VideoReader
 from nite.video_mixer.audio_listener import AudioListener
-from nite.video_mixer.blender import Blender, ThresholdBlender
+from nite.video_mixer.blender import Blender, ThresholdBlender, TimeCycledMathBlender
 from nite.video_mixer.audio import short_format
 
 LOGGING_NAME = 'nite.streamer'
@@ -85,7 +85,7 @@ class VideoCombiner(ProcessWithQueue):
 
             frame = self.blender.blend(audio_sample, frames)
 
-            if self.time_recorder.should_send_keepalive:
+            if self.time_recorder.has_period_passed:
                 logger.info(f'Keep-alive. Elapsed time: {self.time_recorder.elapsed_time_str}')
 
             cv2.imshow("frame combined", frame)
@@ -136,12 +136,13 @@ def main():
         # '/Users/aponcedeleonch/Personal/nite/src/nite/video_mixer/bunny_video-nite_video',
         '/Users/aponcedeleonch/Personal/nite/src/nite/video_mixer/can_video-nite_video'
     ]
-    threshold_blender = ThresholdBlender(threshold=0.1, audio_format=short_format)
+    # blender = ThresholdBlender(threshold=0.1, audio_format=short_format)
+    blender = TimeCycledMathBlender(cycle_time_sec=5)
     video_combiner = VideoCombinerWithAudio(
         video_paths=input_frames,
         video_stream=VideoStream(width=640, height=480),
-        blender=threshold_blender,
-        playback_time_sec=10
+        blender=blender,
+        playback_time_sec=20
     )
     video_combiner.start()
 
