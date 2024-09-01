@@ -3,6 +3,8 @@ import logging.config
 import logging.handlers
 import copy
 
+from nite.config import LOGGING_LEVEL
+
 
 config_dictionary = {
     'version': 1,
@@ -15,19 +17,19 @@ config_dictionary = {
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
-            'level': 'INFO',
+            'level': LOGGING_LEVEL,
             'formatter': 'process',
         }
     },
     'loggers': {
         'nite': {
-            'level': 'INFO',
+            'level': LOGGING_LEVEL,
             'handlers': ['console'],
             'propagate': False
         }
     },
     'root': {
-        'level': 'INFO',
+        'level': LOGGING_LEVEL,
         'handlers': ['console'],
         'propagate': False
     },
