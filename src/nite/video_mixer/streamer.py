@@ -10,8 +10,8 @@ from nite.logging import configure_module_logging
 from nite.video_mixer import ProcessWithQueue, CommQueues, Message
 from nite.video_mixer.video import Video
 from nite.video_mixer.video_io import VideoReader
-from nite.video_mixer.audio_listener import AudioListener
-from nite.video_mixer.blender import Blender, ThresholdBlender, TimeCycledMathBlender
+from nite.video_mixer.audio_listener import AudioListener, AudioActionRMS
+from nite.video_mixer.blender import BlendWithAudio, BlendWithAudioThreshold
 from nite.video_mixer.audio import short_format
 
 LOGGING_NAME = 'nite.streamer'
@@ -41,7 +41,7 @@ class VideoStreamer:
 
 class VideoCombiner(ProcessWithQueue):
 
-    def __init__(self, videos: List[Video], video_stream: VideoStream, queues: CommQueues, blender: Blender) -> None:
+    def __init__(self, videos: List[Video], video_stream: VideoStream, queues: CommQueues, blender: BlendWithAudio) -> None:
         super().__init__(queues=queues)
         self.videos = videos
         self._validate_videos()
@@ -96,7 +96,13 @@ class VideoCombiner(ProcessWithQueue):
 
 class VideoCombinerWithAudio:
 
-    def __init__(self, video_paths: List[str], video_stream: VideoStream, playback_time_sec: int, blender: Blender) -> None:
+    def __init__(
+                self,
+                video_paths: List[str],
+                video_stream: VideoStream,
+                playback_time_sec: int,
+                blender: BlendWithAudio
+            ) -> None:
         queue_to_audio = Queue()
         queue_from_audio = Queue()
         videos = [VideoReader().from_frames(video_path) for video_path in video_paths]
@@ -108,7 +114,11 @@ class VideoCombinerWithAudio:
             blender=blender,
             queues=self.video_queues
         )
-        self.audio_detecter = AudioListener(queues=self.audio_queues, blender=blender, audio_format=short_format)
+        self.audio_detecter = AudioListener(
+            queues=self.audio_queues,
+            audio_action=blender.audio_action,
+            audio_format=short_format
+        )
         self.playback_time_sec = playback_time_sec
 
     def start(self):
@@ -136,13 +146,13 @@ def main():
         # '/Users/aponcedeleonch/Personal/nite/src/nite/video_mixer/bunny_video-nite_video',
         '/Users/aponcedeleonch/Personal/nite/src/nite/video_mixer/can_video-nite_video'
     ]
-    # blender = ThresholdBlender(threshold=0.1, audio_format=short_format)
-    blender = TimeCycledMathBlender(cycle_time_sec=5)
+    audio_action = AudioActionRMS(audio_format=short_format, threshold=0.2)
+    blender = BlendWithAudioThreshold(audio_action=audio_action)
     video_combiner = VideoCombinerWithAudio(
         video_paths=input_frames,
         video_stream=VideoStream(width=640, height=480),
         blender=blender,
-        playback_time_sec=20
+        playback_time_sec=10
     )
     video_combiner.start()
 

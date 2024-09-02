@@ -1,5 +1,6 @@
 import sys
 import struct
+from abc import ABC, abstractmethod
 
 import pyaudio
 import numpy as np
@@ -8,7 +9,6 @@ from nite.config import AUDIO_SAMPLING_RATE
 from nite.logging import configure_module_logging
 from nite.video_mixer import ProcessWithQueue, CommQueues
 from nite.video_mixer.audio import AudioFormat
-from nite.video_mixer.blender import Blender
 
 
 LOGGING_NAME = 'nite.audio_listener'
@@ -18,17 +18,47 @@ logger = configure_module_logging(LOGGING_NAME)
 CHANNELS = 1 if sys.platform == 'darwin' else 2
 
 
+class AudioAction(ABC):
+
+    def __init__(self, audio_format: AudioFormat):
+        self.audio_format = audio_format
+
+    @abstractmethod
+    def process(self, audio_sample: np.ndarray):
+        pass
+
+
+class AudioActionRMS(AudioAction):
+
+    def __init__(self, audio_format: AudioFormat, threshold: float):
+        super().__init__(audio_format)
+        self.threshold = threshold
+        logger.info(f'Loaded threshold blender. Threshold: {threshold}')
+
+    def _calculate_rms(self, audio_sample: np.ndarray) -> float:
+        audio_sample_normalized = audio_sample * self.audio_format.normalization_factor
+        audio_rms = np.sqrt(np.mean(audio_sample_normalized ** 2))
+        return audio_rms
+
+    def process(self, audio_sample: np.ndarray) -> float:
+        audio_rms = self._calculate_rms(audio_sample)
+        logger.debug(f'RMS: {audio_rms}. Audio sample: {audio_sample}.')
+        if audio_rms > self.threshold:
+            return audio_sample[:1]
+        return None
+
+
 class AudioListener(ProcessWithQueue):
 
-    def __init__(self, queues: CommQueues, blender: Blender, audio_format: AudioFormat):
+    def __init__(self, queues: CommQueues, audio_action: AudioAction, audio_format: AudioFormat):
         super().__init__(queues=queues)
         self.audio_format = audio_format
-        self.blender = blender
+        self.audio_action = audio_action
         logger.info(f'Loaded audio listener. Format: {self.audio_format}')
 
     def _process_audio_block(self, in_data, frame_count, time_info, status):
         audio_sample = np.array(struct.unpack(self.audio_format.unpack_format % frame_count, in_data))
-        postprocessed_audio_sample = self.blender.audio_postprocess(audio_sample)
+        postprocessed_audio_sample = self.audio_action.process(audio_sample)
         if postprocessed_audio_sample is not None:
             self.send_audio_sample(audio_sample)
         return in_data, pyaudio.paContinue

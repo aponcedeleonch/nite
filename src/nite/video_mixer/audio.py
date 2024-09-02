@@ -1,6 +1,11 @@
 from pydantic import BaseModel, computed_field
 import pyaudio
 
+from nite.logging import configure_module_logging
+
+LOGGING_NAME = 'nite.audio'
+logger = configure_module_logging(LOGGING_NAME)
+
 
 class AudioFormat(BaseModel):
     name: str

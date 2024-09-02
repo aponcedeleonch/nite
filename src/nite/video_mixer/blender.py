@@ -1,14 +1,12 @@
 from typing import List, Optional
 from abc import ABC, abstractmethod
 from enum import Enum
-import time
 
 import numpy as np
 import cv2
 
 from nite.logging import configure_module_logging
-from nite.video_mixer.audio import AudioFormat
-from nite.video_mixer import TimeRecorder
+from nite.video_mixer.audio_listener import AudioAction, AudioActionRMS
 
 LOGGING_NAME = 'nite.blender'
 logger = configure_module_logging(LOGGING_NAME)
@@ -20,37 +18,8 @@ class Blender(ABC):
         pass
 
     @abstractmethod
-    def audio_postprocess(self, audio_sample: np.ndarray) -> Optional[np.ndarray]:
+    def blend(self, frames: List[cv2.typing.MatLike]) -> cv2.typing.MatLike:
         pass
-
-    @abstractmethod
-    def blend(self, audio_sample: Optional[np.ndarray], frames: List[cv2.typing.MatLike]) -> cv2.typing.MatLike:
-        pass
-
-
-class ThresholdBlender(Blender):
-    def __init__(self, threshold: float, audio_format: AudioFormat) -> None:
-        super().__init__()
-        self.audio_format = audio_format
-        self.threshold = threshold
-        logger.info(f'Loaded threshold blender. Threshold: {threshold}')
-
-    def _calculate_rms(self, audio_sample: np.ndarray) -> float:
-        audio_sample_normalized = audio_sample * self.audio_format.normalization_factor
-        audio_rms = np.sqrt(np.mean(audio_sample_normalized ** 2))
-        return audio_rms
-
-    def audio_postprocess(self, audio_sample: np.ndarray) -> Optional[np.ndarray]:
-        audio_rms = self._calculate_rms(audio_sample)
-        logger.debug(f'RMS: {audio_rms}. Audio sample: {audio_sample}.')
-        if audio_rms > self.threshold:
-            return audio_sample[:1]
-        return None
-
-    def blend(self, audio_sample: Optional[np.ndarray], frames: List[cv2.typing.MatLike]) -> cv2.typing.MatLike:
-        if audio_sample is None:
-            return frames[0]
-        return frames[1]
 
 
 class MathOperation(str, Enum):
@@ -67,10 +36,7 @@ class MathBlender(Blender):
         self.math_operation = math_operation
         logger.info(f'Loaded math blender with operation: {math_operation}')
 
-    def audio_postprocess(self, audio_sample: np.ndarray) -> Optional[np.ndarray]:
-        return None
-
-    def blend(self, audio_sample: Optional[np.ndarray], frames: List[cv2.typing.MatLike]) -> cv2.typing.MatLike:
+    def blend(self, frames: List[cv2.typing.MatLike]) -> cv2.typing.MatLike:
         if self.math_operation == MathOperation.sum:
             return cv2.add(frames[0], frames[1])
         elif self.math_operation == MathOperation.substract:
@@ -81,25 +47,28 @@ class MathBlender(Blender):
             return cv2.divide(frames[0], frames[1])
 
 
-class TimeCycledMathBlender(Blender):
+class BlendWithAudio(ABC):
 
-    def __init__(self, cycle_time_sec: int) -> None:
-        super().__init__()
-        self.time_recorder = TimeRecorder(start_time=time.time(), period_timeout=cycle_time_sec)
-        self.math_operations = [MathOperation.sum, MathOperation.substract, MathOperation.multiply, MathOperation.divide]
-        self.current_idx = 0
-        self.current_blend = MathBlender(math_operation=self.math_operations[self.current_idx])
+    def __init__(self, audio_action: AudioAction) -> None:
+        self.audio_action = audio_action
 
     def audio_postprocess(self, audio_sample: np.ndarray) -> Optional[np.ndarray]:
-        return None
+        return self.audio_action.process(audio_sample)
+
+    @abstractmethod
+    def blend(self, audio_sample: Optional[np.ndarray], frames: List[cv2.typing.MatLike]) -> cv2.typing.MatLike:
+        pass
+
+
+class BlendWithAudioThreshold(BlendWithAudio):
+
+    def __init__(self, audio_action: AudioActionRMS) -> None:
+        super().__init__(audio_action)
 
     def blend(self, audio_sample: Optional[np.ndarray], frames: List[cv2.typing.MatLike]) -> cv2.typing.MatLike:
-        frame = self.current_blend.blend(audio_sample, frames)
-        if self.time_recorder.has_period_passed:
-            self.current_idx = (self.current_idx + 1) % len(self.math_operations)
-            self.current_blend = MathBlender(math_operation=self.math_operations[self.current_idx])
-            logger.info(f'Changed math operation to: {self.math_operations[self.current_idx]}')
-        return frame
+        if audio_sample is None:
+            return frames[0]
+        return frames[1]
 
 
 if __name__ == '__main__':
