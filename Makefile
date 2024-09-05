@@ -8,6 +8,15 @@ install:
 	pip install --upgrade pip; \
 	pip install -e .; \
 
+typecheck:
+	source ./${VENV}/bin/activate; \
+	pip install -r test-requirements.txt; \
+	mypy src; \
+	$(MAKE) test-cleaning
+
+test-cleaning:
+	pip uninstall -r test-requirements.txt -y;
+
 clean:
 	rm -rf venv
 

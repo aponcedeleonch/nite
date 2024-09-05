@@ -1,5 +1,5 @@
 import itertools
-from typing import List
+from typing import List, Generator
 
 from pydantic import BaseModel
 import cv2
@@ -25,7 +25,7 @@ class Video:
         self.metadata = metadata
         self.frames = frames
 
-    def circular_frame_generator(self):
+    def circular_frame_generator(self) -> Generator[cv2.typing.MatLike]:
         circular_iterator = itertools.cycle(self.frames)
         while True:
             yield next(circular_iterator)

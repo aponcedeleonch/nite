@@ -22,23 +22,23 @@ class TimeRecorder(BaseModel):
     last_logged_seconds: int = 0
     period_timeout: int = KEEPALIVE_TIMEOUT
 
-    @computed_field
     @property
+    @computed_field
     def elapsed_time(self) -> float:
         return time.time() - self.start_time
 
-    @computed_field
     @property
+    @computed_field
     def elapsed_seconds(self) -> int:
         return int(self.elapsed_time)
 
-    @computed_field
     @property
+    @computed_field
     def elapsed_time_str(self) -> str:
-        return timedelta(seconds=self.elapsed_time)
+        return f'{timedelta(seconds=self.elapsed_time)}'
 
-    @computed_field
     @property
+    @computed_field
     def has_period_passed(self) -> bool:
         if self.elapsed_seconds % self.period_timeout == 0 and self.elapsed_seconds != self.last_logged_seconds:
             self.last_logged_seconds = self.elapsed_seconds
@@ -96,11 +96,11 @@ class ProcessWithQueue:
         return None
 
     def send_message(self, message: str) -> None:
-        message_obj = Message(content_type='message', content=message)
+        message_obj = Message(content_type=MessageConentType.message, content=message)
         self.queues.out_queue.put(message_obj)
 
     def send_audio_sample(self, audio_sample: np.ndarray) -> None:
-        message_obj = Message(content_type='audio_sample', content=audio_sample.tolist())
+        message_obj = Message(content_type=MessageConentType.audio_sample, content=audio_sample.tolist())
         self.queues.out_queue.put(message_obj)
 
     def receive(self) -> Tuple[bool, Optional[np.ndarray]]:
@@ -112,7 +112,8 @@ class ProcessWithQueue:
             return False, np.array(message_obj.content)
 
         if message_obj.content_type == MessageConentType.message:
-            return self.should_terminate(message_obj.content), None
+            return self.should_terminate(str(message_obj.content)), None
+        return False, None
 
     def should_terminate(self, message: str) -> bool:
         if message == TERMINATE_MESSAGE:

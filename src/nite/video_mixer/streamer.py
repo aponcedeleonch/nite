@@ -1,5 +1,5 @@
 import time
-from typing import List
+from typing import List, Generator
 from multiprocessing import Process, Queue
 
 import cv2
@@ -83,7 +83,7 @@ class VideoCombiner(ProcessWithQueue):
             if should_terminate:
                 break
 
-            frame = self.blender.blend(audio_sample, frames)
+            frame = self.blender.blend(audio_sample, frames)    # type: ignore
 
             if self.time_recorder.has_period_passed:
                 logger.info(f'Keep-alive. Elapsed time: {self.time_recorder.elapsed_time_str}')
@@ -103,8 +103,8 @@ class VideoCombinerWithAudio:
                 playback_time_sec: int,
                 blender: BlendWithAudio
             ) -> None:
-        queue_to_audio = Queue()
-        queue_from_audio = Queue()
+        queue_to_audio: Queue = Queue()
+        queue_from_audio: Queue = Queue()
         videos = [VideoReader().from_frames(video_path) for video_path in video_paths]
         self.video_queues = CommQueues(in_queue=queue_from_audio, out_queue=queue_to_audio)
         self.audio_queues = CommQueues(in_queue=queue_to_audio, out_queue=queue_from_audio)

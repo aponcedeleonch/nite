@@ -60,9 +60,9 @@ class BlenderPick(Blender):
 
 class BlendWithAudio(ABC):
 
-    def __init__(self, audio_actions: List[AudioAction], blender: Blender) -> None:
-        self.audio_actions = audio_actions
+    def __init__(self, blender, audio_actions) -> None:
         self.blender = blender
+        self.audio_actions = audio_actions
 
     @abstractmethod
     def blend(self, audio_sample: Optional[np.ndarray], frames: List[cv2.typing.MatLike]) -> cv2.typing.MatLike:
@@ -72,7 +72,7 @@ class BlendWithAudio(ABC):
 class BlendWithAudioPick(BlendWithAudio):
 
     def __init__(self, audio_actions: List[AudioAction]) -> None:
-        super().__init__(audio_actions, blender=BlenderPick())
+        super().__init__(blender=BlenderPick(), audio_actions=audio_actions)
 
     def blend(self, audio_sample: Optional[np.ndarray], frames: List[cv2.typing.MatLike]) -> cv2.typing.MatLike:
         if audio_sample is None:
@@ -80,17 +80,3 @@ class BlendWithAudioPick(BlendWithAudio):
         else:
             self.blender.pick = 1
         return self.blender.blend(frames)
-
-
-if __name__ == '__main__':
-    frames = [
-        '/Users/aponcedeleonch/Personal/nite/src/nite/video_mixer/bunny_video-nite_video/frame00000.png',
-        '/Users/aponcedeleonch/Personal/nite/src/nite/video_mixer/can_video-nite_video/frame00000.png'
-    ]
-    frames_orig = [cv2.imread(frame) for frame in frames]
-    frames = [cv2.resize(frame, (640, 480)) for frame in frames_orig]
-    blender = BlenderMath(math_operation='divide')
-    output_frame = blender.blend(None, frames)
-    cv2.imshow('output_frame', output_frame)
-    cv2.waitKey(5)
-    cv2.destroyAllWindows()
