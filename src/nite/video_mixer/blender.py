@@ -6,7 +6,7 @@ import numpy as np
 import cv2
 
 from nite.logging import configure_module_logging
-from nite.video_mixer.audio_listener import AudioAction, AudioActionRMS
+from nite.video_mixer.audio_listener import AudioAction
 
 LOGGING_NAME = 'nite.blender'
 logger = configure_module_logging(LOGGING_NAME)
@@ -29,7 +29,7 @@ class MathOperation(str, Enum):
     divide = 'divide'
 
 
-class MathBlender(Blender):
+class BlenderMath(Blender):
 
     def __init__(self, math_operation: MathOperation) -> None:
         super().__init__()
@@ -47,28 +47,39 @@ class MathBlender(Blender):
             return cv2.divide(frames[0], frames[1])
 
 
+class BlenderPick(Blender):
+
+    def __init__(self, pick: int = 0) -> None:
+        super().__init__()
+        self.pick = pick
+        logger.info(f'Loaded pick blender with pick: {pick}')
+
+    def blend(self, frames: List[cv2.typing.MatLike]) -> cv2.typing.MatLike:
+        return frames[self.pick]
+
+
 class BlendWithAudio(ABC):
 
-    def __init__(self, audio_action: AudioAction) -> None:
-        self.audio_action = audio_action
-
-    def audio_postprocess(self, audio_sample: np.ndarray) -> Optional[np.ndarray]:
-        return self.audio_action.process(audio_sample)
+    def __init__(self, audio_actions: List[AudioAction], blender: Blender) -> None:
+        self.audio_actions = audio_actions
+        self.blender = blender
 
     @abstractmethod
     def blend(self, audio_sample: Optional[np.ndarray], frames: List[cv2.typing.MatLike]) -> cv2.typing.MatLike:
         pass
 
 
-class BlendWithAudioThreshold(BlendWithAudio):
+class BlendWithAudioPick(BlendWithAudio):
 
-    def __init__(self, audio_action: AudioActionRMS) -> None:
-        super().__init__(audio_action)
+    def __init__(self, audio_actions: List[AudioAction]) -> None:
+        super().__init__(audio_actions, blender=BlenderPick())
 
     def blend(self, audio_sample: Optional[np.ndarray], frames: List[cv2.typing.MatLike]) -> cv2.typing.MatLike:
         if audio_sample is None:
-            return frames[0]
-        return frames[1]
+            self.blender.pick = 0
+        else:
+            self.blender.pick = 1
+        return self.blender.blend(frames)
 
 
 if __name__ == '__main__':
@@ -78,7 +89,7 @@ if __name__ == '__main__':
     ]
     frames_orig = [cv2.imread(frame) for frame in frames]
     frames = [cv2.resize(frame, (640, 480)) for frame in frames_orig]
-    blender = MathBlender(math_operation='divide')
+    blender = BlenderMath(math_operation='divide')
     output_frame = blender.blend(None, frames)
     cv2.imshow('output_frame', output_frame)
     cv2.waitKey(5)

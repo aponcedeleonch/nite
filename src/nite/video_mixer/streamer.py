@@ -11,7 +11,7 @@ from nite.video_mixer import ProcessWithQueue, CommQueues, Message
 from nite.video_mixer.video import Video
 from nite.video_mixer.video_io import VideoReader
 from nite.video_mixer.audio_listener import AudioListener, AudioActionRMS
-from nite.video_mixer.blender import BlendWithAudio, BlendWithAudioThreshold
+from nite.video_mixer.blender import BlendWithAudio, BlendWithAudioPick
 from nite.video_mixer.audio import short_format
 
 LOGGING_NAME = 'nite.streamer'
@@ -116,7 +116,7 @@ class VideoCombinerWithAudio:
         )
         self.audio_detecter = AudioListener(
             queues=self.audio_queues,
-            audio_action=blender.audio_action,
+            audio_actions=blender.audio_actions,
             audio_format=short_format
         )
         self.playback_time_sec = playback_time_sec
@@ -147,7 +147,7 @@ def main():
         '/Users/aponcedeleonch/Personal/nite/src/nite/video_mixer/can_video-nite_video'
     ]
     audio_action = AudioActionRMS(audio_format=short_format, threshold=0.2)
-    blender = BlendWithAudioThreshold(audio_action=audio_action)
+    blender = BlendWithAudioPick(audio_actions=[audio_action])
     video_combiner = VideoCombinerWithAudio(
         video_paths=input_frames,
         video_stream=VideoStream(width=640, height=480),
