@@ -1,5 +1,5 @@
 import time
-from typing import List, Generator
+from typing import List
 from multiprocessing import Process, Queue
 
 import cv2

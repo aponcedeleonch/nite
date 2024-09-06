@@ -1,4 +1,4 @@
-.PHONY: install, clean, start-web
+.PHONY: install, clean, typecheck, lint, test-setup, test-cleaning, start, start-dev
 
 VENV?=venv
 
@@ -8,17 +8,23 @@ install:
 	pip install --upgrade pip; \
 	pip install -e .; \
 
-typecheck:
+clean:
+	rm -rf venv; \
+
+test-setup:
 	source ./${VENV}/bin/activate; \
 	pip install -r test-requirements.txt; \
-	mypy src; \
+
+typecheck: test-setup
+	mypy src;
+	$(MAKE) test-cleaning
+
+lint: test-setup
+	flake8 src;
 	$(MAKE) test-cleaning
 
 test-cleaning:
 	pip uninstall -r test-requirements.txt -y;
-
-clean:
-	rm -rf venv
 
 start:
 	source ./${VENV}/bin/activate; \

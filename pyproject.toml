@@ -6,12 +6,10 @@ build-backend = "hatchling.build"
 name = "nite"
 version = "0.0.1"
 dependencies = [
-  "networkx==3.3",
   "Flask==3.0.3",
   "pydantic==2.8.2",
   "opencv-python==4.10.0.84",
-  "PyAudio==0.2.14",
-  "numpy==2.1.0"
+  "PyAudio==0.2.14"
 ]
 requires-python = ">=3.12"
 authors = [

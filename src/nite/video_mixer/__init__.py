@@ -67,10 +67,10 @@ class Message(BaseModel):
             try:
                 content_npy = np.array(content)
             except Exception:
-                raise ValueError('Message content must be transformable to a numpy array as content_type is audio_sample')
+                raise ValueError('content_type = audio_sample: Message content must be transformable to a numpy array')
 
             if not np.issubdtype(content_npy.dtype, np.number):
-                raise ValueError('Message content must be a float array as content_type is audio_sample')
+                raise ValueError('content_type = audio_sample. Message content must be a float array')
 
         return content
 
