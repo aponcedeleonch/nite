@@ -6,8 +6,7 @@ from multiprocessing import Queue
 from queue import Empty as QueueEmpty
 from dataclasses import dataclass
 
-from pydantic import BaseModel, computed_field, field_validator
-from pydantic_core.core_schema import FieldValidationInfo
+from pydantic import BaseModel, computed_field, field_validator, ValidationInfo
 import numpy as np
 
 from nite.config import TERMINATE_MESSAGE, KEEPALIVE_TIMEOUT
@@ -18,30 +17,48 @@ logger = configure_module_logging(LOGGING_NAME)
 
 
 class TimeRecorder(BaseModel):
-    start_time: float
-    last_logged_seconds: int = 0
-    period_timeout: int = KEEPALIVE_TIMEOUT
+    start_time: Optional[float] = None
+    time_from_last_timeout: Optional[float] = None
+    period_timeout_sec: float = KEEPALIVE_TIMEOUT
 
+    @field_validator('period_timeout_sec')
+    @classmethod
+    def period_timeout_sec_not_zero(cls, period_timeout_sec):
+        if period_timeout_sec <= 0:
+            raise ValueError('period_timeout_sec must be greater than 0')
+        return period_timeout_sec
+
+    def start_recording_if_not_started(self):
+        if not self.start_time:
+            self.start_time = time.time()
+            self.time_from_last_timeout = self.start_time
+
+    @computed_field  # type: ignore[misc]
     @property
-    @computed_field
     def elapsed_time(self) -> float:
+        if self.start_time is None:
+            raise ValueError('TimeRecorder has not started recording time')
         return time.time() - self.start_time
 
+    @computed_field  # type: ignore[misc]
     @property
-    @computed_field
-    def elapsed_seconds(self) -> int:
-        return int(self.elapsed_time)
+    def elapsed_time_since_last_timeout(self) -> float:
+        if self.time_from_last_timeout is None:
+            self.time_from_last_timeout = time.time()
+        return time.time() - self.time_from_last_timeout
 
+    @computed_field  # type: ignore[misc]
     @property
-    @computed_field
     def elapsed_time_str(self) -> str:
         return f'{timedelta(seconds=self.elapsed_time)}'
 
+    @computed_field  # type: ignore[misc]
     @property
-    @computed_field
     def has_period_passed(self) -> bool:
-        if self.elapsed_seconds % self.period_timeout == 0 and self.elapsed_seconds != self.last_logged_seconds:
-            self.last_logged_seconds = self.elapsed_seconds
+        time_since_last_timeout = self.elapsed_time_since_last_timeout
+        if time_since_last_timeout >= self.period_timeout_sec:
+            offset = time_since_last_timeout - self.period_timeout_sec
+            self.time_from_last_timeout = time.time() - offset
             return True
         return False
 
@@ -56,7 +73,8 @@ class Message(BaseModel):
     content: Union[str, List[float]]
 
     @field_validator('content')
-    def content_respects_type(cls, content, info: FieldValidationInfo):
+    @classmethod
+    def content_respects_type(cls, content, info: ValidationInfo):
         if 'content_type' not in info.data:
             raise ValueError('Message content_type must be defined')
 

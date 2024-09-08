@@ -6,18 +6,13 @@ import json
 
 import cv2
 
-from nite.video_mixer.video import Video, VideoMetadata
+from nite.video_mixer.video import VideoFramesPath, VideoMetadata, VideoFramesImg, VideoFrames
 from nite.config import METADATA_FILENAME, SUFFIX_NITE_VIDEO_FOLDER
 from nite.logging import configure_module_logging
 
 
 LOGGING_NAME = 'nite.video_io'
 logger = configure_module_logging(LOGGING_NAME)
-
-
-def calculate_zero_padding(num_frames: float) -> int:
-    num_frames_int = int(num_frames) if int(num_frames) == num_frames else int(num_frames) + 1
-    return len(str(num_frames_int))
 
 
 class VideoReader:
@@ -47,55 +42,57 @@ class VideoReader:
         logger.info(f'Metadata read from JSON {metadata.name}. Metadata: {metadata}')
         return metadata
 
-    def from_video(self, input_video: str) -> Video:
+    def from_video(self, input_video: str) -> VideoFramesImg:
         start_time = time.time()
         metadata = self._read_metadata_from_video(input_video)
         video_capture = cv2.VideoCapture(input_video)
         frame_count = 0
-        frames = []
+        frames_imgs = []
         while video_capture.isOpened() and frame_count < metadata.num_frames:
             # Extract the frame
             ret, frame = video_capture.read()
             if not ret:
                 continue
-            frames.append(frame)
+            frames_imgs.append(frame)
             frame_count += 1
 
         video_capture.release()
         elapsed_time = time.time() - start_time
         logger.info(f'Video {metadata.name} converted to frames in {timedelta(seconds=elapsed_time)} seconds')
-        return Video(metadata=metadata, frames=frames)
+        return VideoFramesImg(metadata=metadata, frames_imgs=frames_imgs)
 
-    def from_frames(self, input_frames_dir: str) -> Video:
-        image_frames_dir = Path(input_frames_dir)
-        if not image_frames_dir.is_dir():
+    def from_frames(self, input_frames_dir: str, width: int, height: int) -> VideoFramesPath:
+        base_frames_dir = Path(input_frames_dir)
+        if not base_frames_dir.is_dir():
             raise FileNotFoundError(f'Input frames directory not found at {input_frames_dir}')
 
-        metadata = self._read_metadata_from_json(input_frames_dir)
-        num_zeros_padded = calculate_zero_padding(metadata.num_frames)
-        frames_paths = sorted(image_frames_dir.glob('*.png'), key=lambda x: int(x.stem[num_zeros_padded:]))
-        frames = [cv2.imread(str(frame_path)) for frame_path in frames_paths]
-        logger.info(f'Frames of {metadata.name} read from {input_frames_dir}')
-        return Video(metadata=metadata, frames=frames)
+        image_frames_dir = base_frames_dir / f'{width}x{height}'
+        if image_frames_dir.is_dir():
+            metadata = self._read_metadata_from_json(str(image_frames_dir))
+            return VideoFramesPath(metadata=metadata, image_frames_dir=image_frames_dir)
+
+        logger.info(f'Frames directory for resolution {width}x{height} not found in {base_frames_dir}. Creating it.')
+        subdirs_existent_resolution = [subdir for subdir in base_frames_dir.iterdir() if subdir.is_dir()]
+        greatest_existing_resolution = max(subdirs_existent_resolution, key=lambda x: int(x.stem.split('x')[0]))
+        metadata = self._read_metadata_from_json(str(greatest_existing_resolution))
+        video_frames_paths = VideoFramesPath(metadata=metadata, image_frames_dir=greatest_existing_resolution)
+        video_frames_paths.resize_frames(width, height)
+        return video_frames_paths
 
 
 class VideoWriter:
 
-    def __init__(self, video: Video, output_base_dir: Optional[str] = None) -> None:
+    def __init__(self, video: VideoFrames, output_base_dir: Optional[str] = None) -> None:
         self.video = video
         if not output_base_dir:
             output_base_dir_path = Path('.')
         else:
             output_base_dir_path = Path(output_base_dir)
 
-        self.output_dir = output_base_dir_path / f'{self.video.metadata.name}-{SUFFIX_NITE_VIDEO_FOLDER}'
+        video_folder = f'{self.video.metadata.name}-{SUFFIX_NITE_VIDEO_FOLDER}'
+        resolution_folder = f'{self.video.metadata.width}x{self.video.metadata.height}'
+        self.output_dir = output_base_dir_path / video_folder / resolution_folder
         self.output_dir.mkdir(exist_ok=True, parents=True)
-
-    def _write_metadata_to_json(self) -> None:
-        metadata_file = self.output_dir / METADATA_FILENAME
-        with open(metadata_file, 'w') as file:
-            file.write(self.video.metadata.model_dump_json())
-        logger.info(f'Metadata of video {self.video.metadata.name} written to {metadata_file}')
 
     def to_video(self) -> None:
         # Force mp4 extension
@@ -103,32 +100,31 @@ class VideoWriter:
         fourcc = cv2.VideoWriter.fourcc(*'mp4v')
         output_video = self.output_dir / f'{self.video.metadata.name}_reconstructed.mp4'
 
-        self._write_metadata_to_json()
+        self.video.metadata.to_json(self.output_dir)
 
         video_dims = (self.video.metadata.width, self.video.metadata.height)
         video_writer = cv2.VideoWriter(str(output_video), fourcc, self.video.metadata.fps, video_dims)
-        for frame in self.video.frames:
+        for frame in self.video.frame_as_img:
             video_writer.write(frame)
         video_writer.release()
         logger.info(f'Video {self.video.metadata.name} file: {output_video} written')
 
     def to_frames(self) -> None:
-        self._write_metadata_to_json()
-        num_zeros_padded = calculate_zero_padding(self.video.metadata.num_frames)
-        for i_frame, frame in enumerate(self.video.frames):
-            out_frame = self.output_dir / f'frame{i_frame:0{num_zeros_padded}}.png'
+        self.video.metadata.to_json(self.output_dir)
+        for i_frame, frame in enumerate(self.video.frame_as_img):
+            out_frame = self.output_dir / f'frame{i_frame:0{self.video.metadata.zero_padding}}.png'
             cv2.imwrite(str(out_frame), frame)
 
         logger.info(f'Frames of {self.video.metadata.name} written to {self.output_dir}')
 
 
 if __name__ == "__main__":
-    input_loc = '/Users/aponcedeleonch/Personal/bunny_video.mp4'
-    video = VideoReader().from_video(input_loc)
-    video_writer = VideoWriter(video, output_base_dir='/Users/aponcedeleonch/Personal/nite/src/nite/video')
+    input_loc = '/Users/aponcedeleonch/Personal/can_video.mp4'
+    video_frames_img = VideoReader().from_video(input_loc)
+    video_writer = VideoWriter(video_frames_img, output_base_dir='/Users/aponcedeleonch/Personal/nite/src/nite/video_mixer')
     video_writer.to_frames()
 
-    # input_frames = '/Users/aponcedeleonch/Personal/nite/src/nite/video/bunny_video-nite_video'
-    # video = VideoReader().from_frames(input_frames)
-    # video_writer = VideoWriter(video, output_base_dir='/Users/aponcedeleonch/Personal/nite/src/nite/video')
+    input_frames = '/Users/aponcedeleonch/Personal/nite/src/nite/video_mixer/can_video-nite_video'
+    video_frames_paths = VideoReader().from_frames(input_frames, 640, 480)
+    # video_writer = VideoWriter(video, output_base_dir='/Users/aponcedeleonch/Personal/nite/src/nite/video_mixer')
     # video_writer.to_video()

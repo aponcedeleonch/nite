@@ -1,6 +1,5 @@
 import sys
 import struct
-from abc import ABC, abstractmethod
 from typing import List
 import concurrent.futures
 
@@ -11,6 +10,7 @@ from nite.config import AUDIO_SAMPLING_RATE, MAX_ACION_WORKERS
 from nite.logging import configure_module_logging
 from nite.video_mixer import ProcessWithQueue, CommQueues
 from nite.video_mixer.audio import AudioFormat
+from nite.video_mixer.audio_action import AudioAction
 
 
 LOGGING_NAME = 'nite.audio_listener'
@@ -18,37 +18,6 @@ logger = configure_module_logging(LOGGING_NAME)
 
 # Need to still investigate what is CHANNELS.
 CHANNELS = 1 if sys.platform == 'darwin' else 2
-
-
-class AudioAction(ABC):
-
-    def __init__(self):
-        pass
-
-    @abstractmethod
-    def process(self, audio_sample: np.ndarray) -> bool:
-        pass
-
-
-class AudioActionRMS(AudioAction):
-
-    def __init__(self, audio_format: AudioFormat, threshold: float):
-        super().__init__()
-        self.audio_format = audio_format
-        self.threshold = threshold
-        logger.info(f'Loaded threshold blender. Threshold: {threshold}')
-
-    def _calculate_rms(self, audio_sample: np.ndarray) -> float:
-        audio_sample_normalized = audio_sample * self.audio_format.normalization_factor
-        audio_rms = np.sqrt(np.mean(audio_sample_normalized ** 2))
-        return audio_rms
-
-    def process(self, audio_sample: np.ndarray) -> bool:
-        audio_rms = self._calculate_rms(audio_sample)
-        logger.debug(f'RMS: {audio_rms}. Audio sample: {audio_sample}.')
-        if audio_rms > self.threshold:
-            return True
-        return False
 
 
 class AudioListener(ProcessWithQueue):

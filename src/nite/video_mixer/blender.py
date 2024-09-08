@@ -6,7 +6,7 @@ import numpy as np
 import cv2
 
 from nite.logging import configure_module_logging
-from nite.video_mixer.audio_listener import AudioAction
+from nite.video_mixer.audio_action import AudioAction
 
 LOGGING_NAME = 'nite.blender'
 logger = configure_module_logging(LOGGING_NAME)

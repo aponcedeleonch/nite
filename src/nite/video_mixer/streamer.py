@@ -8,9 +8,10 @@ from pydantic import BaseModel
 from nite.config import TERMINATE_MESSAGE
 from nite.logging import configure_module_logging
 from nite.video_mixer import ProcessWithQueue, CommQueues, Message
-from nite.video_mixer.video import Video
+from nite.video_mixer.video import VideoFramesPath
 from nite.video_mixer.video_io import VideoReader
-from nite.video_mixer.audio_listener import AudioListener, AudioActionRMS
+from nite.video_mixer.audio_listener import AudioListener
+from nite.video_mixer.audio_action import AudioActionRMS, AudioActionBPM, BPMActionFrequency
 from nite.video_mixer.blender import BlendWithAudio, BlendWithAudioPick
 from nite.video_mixer.audio import short_format
 
@@ -23,31 +24,20 @@ class VideoStream(BaseModel):
     height: int
 
 
-class VideoStreamer:
-    def __init__(self, video: Video):
-        self.video = video
-        self.ms_to_wait = self._calculate_ms_between_frames()
-        logger.info(f"Loaded streamer. Video: {self.video.metadata.name}. ms to wait between frames: {self.ms_to_wait}")
-
-    def _calculate_ms_between_frames(self):
-        ms_to_wait = int(1000 / self.video.metadata.fps)
-        return ms_to_wait
-
-    def stream(self):
-        for frame in self.video.circular_frame_generator():
-            cv2.imshow("frame", frame)
-            cv2.waitKey(self.ms_to_wait)
-
-
 class VideoCombiner(ProcessWithQueue):
 
-    def __init__(self, videos: List[Video], video_stream: VideoStream, queues: CommQueues, blender: BlendWithAudio) -> None:
+    def __init__(
+                self,
+                videos: List[VideoFramesPath],
+                video_stream: VideoStream,
+                queues: CommQueues,
+                blender: BlendWithAudio
+            ) -> None:
         super().__init__(queues=queues)
         self.videos = videos
         self._validate_videos()
         self.video_stream = video_stream
         self.ms_to_wait = self._calculate_ms_between_frames()
-        self._resize_videos()
         self.blender = blender
         string_videos = ", ".join([
                                     f'Video {i_vid + 1}: {video.metadata.name}. FPS: {video.metadata.fps}'
@@ -70,10 +60,6 @@ class VideoCombiner(ProcessWithQueue):
         average_fps = sum_fps / len(self.videos)
         ms_to_wait = int(1000 / average_fps)
         return ms_to_wait
-
-    def _resize_videos(self) -> None:
-        for video in self.videos:
-            video.resize_frames(self.video_stream.width, self.video_stream.height)
 
     def stream(self) -> None:
         generators = [video.circular_frame_generator() for video in self.videos]
@@ -105,7 +91,10 @@ class VideoCombinerWithAudio:
             ) -> None:
         queue_to_audio: Queue = Queue()
         queue_from_audio: Queue = Queue()
-        videos = [VideoReader().from_frames(video_path) for video_path in video_paths]
+        videos = [
+                    VideoReader().from_frames(video_path, video_stream.width, video_stream.height)
+                    for video_path in video_paths
+                ]
         self.video_queues = CommQueues(in_queue=queue_from_audio, out_queue=queue_to_audio)
         self.audio_queues = CommQueues(in_queue=queue_to_audio, out_queue=queue_from_audio)
         self.video_combiner = VideoCombiner(
@@ -147,7 +136,8 @@ def main():
         '/Users/aponcedeleonch/Personal/nite/src/nite/video_mixer/can_video-nite_video'
     ]
     audio_action = AudioActionRMS(audio_format=short_format, threshold=0.2)
-    blender = BlendWithAudioPick(audio_actions=[audio_action])
+    audio_action_2 = AudioActionBPM(bpm=120, bpm_action_frequency=BPMActionFrequency.kick)
+    blender = BlendWithAudioPick(audio_actions=[audio_action, audio_action_2])
     video_combiner = VideoCombinerWithAudio(
         video_paths=input_frames,
         video_stream=VideoStream(width=640, height=480),

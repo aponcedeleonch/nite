@@ -13,13 +13,13 @@ class AudioFormat(BaseModel):
     bits_per_sample: int
     unpack_format: str
 
+    @computed_field  # type: ignore[misc]
     @property
-    @computed_field
     def max_value(self) -> int:
         return 2 ** self.bits_per_sample
 
+    @computed_field  # type: ignore[misc]
     @property
-    @computed_field
     def normalization_factor(self) -> float:
         return 1 / self.max_value
 
