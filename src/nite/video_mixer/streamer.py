@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 from nite.config import TERMINATE_MESSAGE
 from nite.logging import configure_module_logging
-from nite.video_mixer import ProcessWithQueue, CommQueues, Message
+from nite.video_mixer import ProcessWithQueue, CommQueues, Message, TimeRecorder
 from nite.video_mixer.video import VideoFramesPath
 from nite.video_mixer.video_io import VideoReader
 from nite.video_mixer.audio_listener import AudioListener
@@ -34,6 +34,7 @@ class VideoCombiner(ProcessWithQueue):
                 blender: BlendWithAudio
             ) -> None:
         super().__init__(queues=queues)
+        self.time_recorder = TimeRecorder()
         self.videos = videos
         self._validate_videos()
         self.video_stream = video_stream
@@ -64,6 +65,7 @@ class VideoCombiner(ProcessWithQueue):
     def stream(self) -> None:
         generators = [video.circular_frame_generator() for video in self.videos]
         logger.info("Starting stream")
+        self.time_recorder.start_recording_if_not_started()
         for frames in zip(*generators):
             should_terminate, audio_sample = self.receive()
             if should_terminate:

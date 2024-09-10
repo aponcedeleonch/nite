@@ -103,7 +103,6 @@ class ProcessWithQueue:
 
     def __init__(self, queues: CommQueues) -> None:
         self.queues = queues
-        self.time_recorder = TimeRecorder(start_time=time.time())
 
     def _receive_from_queue(self) -> Optional[Message]:
         try:
