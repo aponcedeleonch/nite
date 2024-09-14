@@ -4,7 +4,6 @@ import concurrent.futures
 
 import pyaudio
 import numpy as np
-import librosa
 
 from nite.config import AUDIO_SAMPLING_RATE, MAX_ACION_WORKERS, AUDIO_CHANNELS
 from nite.logging import configure_module_logging
@@ -15,42 +14,6 @@ from nite.video_mixer.audio_action import AudioAction
 
 LOGGING_NAME = 'nite.audio_listener'
 logger = configure_module_logging(LOGGING_NAME)
-
-
-class BPMDetecter:
-
-    def __init__(self):
-        self.audio = np.zeros(0)
-        # self.detected_bpms = np.zeros(0)
-        self.detected_bpm = None
-        self.bpm_change_threshold = 5
-        self.time_recorder = TimeRecorder(period_timeout_sec=3)
-
-    def process(self, audio_sample: np.ndarray) -> bool:
-        self.audio = np.append(self.audio, audio_sample, axis=0)
-        self.audio = self.audio[-5 * AUDIO_SAMPLING_RATE:]  # Keep last 30 seconds of audio
-
-        if len(self.audio) < 4 * AUDIO_SAMPLING_RATE:
-            return False
-
-        new_detected_bpm, _ = librosa.beat.beat_track(y=self.audio, sr=AUDIO_SAMPLING_RATE)
-
-        if self.detected_bpm is None:
-            self.detected_bpm = new_detected_bpm
-            logger.info(f'Original Detected BPM: {self.detected_bpm}')
-        else:
-            if abs(new_detected_bpm - self.detected_bpm) > self.bpm_change_threshold:
-                logger.info(f'Significant BPM change detected: {new_detected_bpm}')
-                self.audio = np.zeros(0)  # Reset audio buffer
-                self.detected_bpm = new_detected_bpm
-            else:
-                self.detected_bpm = (self.detected_bpm + new_detected_bpm) / 2  # Weighted average
-                # logger.info(f'Updated Detected BPM: {self.detected_bpm}')
-
-        if self.time_recorder.has_period_passed:
-            logger.info(f'Detected BPM: {self.detected_bpm}')
-
-        return False
 
 
 class AudioListener(ProcessWithQueue):
@@ -111,12 +74,13 @@ if __name__ == '__main__':
     from nite.video_mixer.audio import short_format
     from nite.video_mixer import Message
     from nite.config import TERMINATE_MESSAGE
+    from nite.video_mixer.audio_action import AudioActionBPM, BPMActionFrequency
 
     queue_to_audio = Queue()
     queue_from_audio = Queue()
     queues = CommQueues(in_queue=queue_to_audio, out_queue=queue_from_audio)
-    bpm_detecter = BPMDetecter()
-    audio_listener = AudioListener(queues=queues, audio_actions=[bpm_detecter], audio_format=short_format)
+    audio_action_bpm = AudioActionBPM(BPMActionFrequency.kick)
+    audio_listener = AudioListener(queues=queues, audio_actions=[audio_action_bpm], audio_format=short_format)
     audio_process = Process(target=audio_listener.start)
     audio_process.start()
     time.sleep(180)
