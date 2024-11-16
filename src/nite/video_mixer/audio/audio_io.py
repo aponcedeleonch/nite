@@ -1,15 +1,17 @@
+import concurrent.futures
 import struct
 from typing import List
-import concurrent.futures
 
-import pyaudio
+import librosa
 import numpy as np
+import pyaudio
 
 from nite.config import AUDIO_SAMPLING_RATE, MAX_ACION_WORKERS, AUDIO_CHANNELS
 from nite.logging import configure_module_logging
 from nite.video_mixer import ProcessWithQueue, CommQueues, TimeRecorder
-from nite.video_mixer.audio import AudioFormat
-from nite.video_mixer.audio_action import AudioAction
+from nite.video_mixer.audio.audio import AudioFormat
+from nite.video_mixer.audio.audio_action import AudioAction
+from nite.video_mixer.audio.audio_processing import AudioProcessor
 
 
 LOGGING_NAME = 'nite.audio_listener'
@@ -28,7 +30,7 @@ class AudioListener(ProcessWithQueue):
     def _get_results_of_audio_actions(self, audio_sample: np.ndarray) -> bool:
         audio_action_results = []
         with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_ACION_WORKERS) as executor:
-            future_to_action = [executor.submit(action.process, audio_sample) for action in self.audio_actions]
+            future_to_action = [executor.submit(action.act, audio_sample) for action in self.audio_actions]
             for future in concurrent.futures.as_completed(future_to_action):
                 try:
                     audio_action_results.append(future.result())
@@ -68,22 +70,13 @@ class AudioListener(ProcessWithQueue):
         logger.info(f'Audio listening stopped. Elapsed time: {self.time_recorder.elapsed_time_str}')
 
 
-if __name__ == '__main__':
-    import time
-    from multiprocessing import Queue, Process
-    from nite.video_mixer.audio import short_format
-    from nite.video_mixer import Message
-    from nite.config import TERMINATE_MESSAGE
-    from nite.video_mixer.audio_action import AudioActionBPM, BPMActionFrequency
+class AudioAnalyzer:
 
-    queue_to_audio = Queue()
-    queue_from_audio = Queue()
-    queues = CommQueues(in_queue=queue_to_audio, out_queue=queue_from_audio)
-    audio_action_bpm = AudioActionBPM(BPMActionFrequency.kick)
-    audio_listener = AudioListener(queues=queues, audio_actions=[audio_action_bpm], audio_format=short_format)
-    audio_process = Process(target=audio_listener.start)
-    audio_process.start()
-    time.sleep(180)
-    terminate_message = Message(content=TERMINATE_MESSAGE, content_type='message')
-    queue_to_audio.put(terminate_message)
-    audio_process.join()
+    def __init__(self, audio_processor: AudioProcessor) -> None:
+        self.audio_processor = audio_processor
+
+    async def analyze_song(self, song_path: str) -> None:
+        audio_sample, sampling_rate = librosa.load(song_path)
+        self.audio_processor.set_sampling_rate(sampling_rate)
+        audio_features = await self.audio_processor.process_audio_sample(audio_sample)
+        return audio_features

@@ -6,8 +6,8 @@ __pycache__
 # Mac stuff
 .DS_Store
 
-# For the moment ignore PureData files
-*.pd
-
 # Frame generated videos
 **/*nite_video/*
+
+# For the moment the notebooks are just meant for local experiments
+**/*.ipynb

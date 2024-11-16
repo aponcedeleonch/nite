@@ -9,8 +9,7 @@ import cv2
 from nite.config import METADATA_FILENAME
 from nite.logging import configure_module_logging
 
-LOGGING_NAME = 'nite.video'
-logger = configure_module_logging(LOGGING_NAME)
+logger = configure_module_logging('nite.video')
 
 
 class VideoMetadata(BaseModel):
@@ -47,6 +46,9 @@ class VideoFrames(ABC):
         self.metadata.width = width
         self.metadata.height = height
 
+    def convert_to_alpha(self) -> None:
+        pass
+
     @property
     @abstractmethod
     def frame_as_img(self):
@@ -67,6 +69,9 @@ class VideoFramesImg(VideoFrames):
     def resize_frames(self, width: int, height: int) -> None:
         super().resize_frames(width, height)
         self.frames_imgs = [cv2.resize(frame, (width, height)) for frame in self.frames_imgs]
+
+    def convert_to_alpha(self) -> None:
+        self.frames_imgs = [cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA) for frame in self.frames_imgs]
 
     @property
     def frame_as_img(self):
@@ -106,6 +111,26 @@ class VideoFramesPath(VideoFrames):
         self.metadata.to_json(frames_base_path_resized)
         self.frames_paths = new_paths
         logger.info(f"Resized frames of {self.metadata.name} to {width}x{height}.")
+
+    def convert_to_alpha(self) -> None:
+        frames_base_path = Path(self.frames_paths[0]).parent
+        frames_base_path_alpha = frames_base_path / 'alpha'
+        if frames_base_path_alpha.is_dir():
+            logger.info('Frames directory found with alpha channel. Not converting.')
+            self.frames_paths = self.get_frame_paths_from_dir(frames_base_path_alpha)
+            return
+
+        frames_base_path_alpha.mkdir(exist_ok=True, parents=True)
+        new_paths = []
+        for frame_path in self.frames_paths:
+            frame = cv2.imread(str(frame_path))
+            frame_alpha = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
+            frame_alpha_path = frames_base_path_alpha / frame_path.name
+            new_paths.append(frame_alpha_path)
+            cv2.imwrite(str(frame_alpha_path), frame_alpha)
+
+        self.frames_paths = new_paths
+        logger.info(f"Converted frames of {self.metadata.name} to alpha channel.")
 
     def get_frame_paths_from_dir(self, image_frames_dir: Path) -> List[Path]:
         logger.info(f'Frames of {self.metadata.name} read from {image_frames_dir}')

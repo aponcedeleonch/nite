@@ -3,58 +3,50 @@ from typing import List
 from multiprocessing import Process, Queue
 
 import cv2
-from pydantic import BaseModel
 
 from nite.config import TERMINATE_MESSAGE
 from nite.logging import configure_module_logging
-from nite.video_mixer import ProcessWithQueue, CommQueues, Message, TimeRecorder
-from nite.video_mixer.video import VideoFramesPath
-from nite.video_mixer.video_io import VideoReader
-from nite.video_mixer.audio_listener import AudioListener
-from nite.video_mixer.audio_action import AudioActionRMS, AudioActionBPM, BPMActionFrequency
-from nite.video_mixer.blender import BlendWithAudio, BlendWithAudioPick
-from nite.video_mixer.audio import short_format
+from nite.video_mixer import CommQueues, Message, TimeRecorder
+from nite.video_mixer.audio.audio import short_format
+from nite.video_mixer.audio.audio_action import AudioActions
+from nite.video_mixer.blender import BlendWithAudio, BlendWithSong
+from nite.video_mixer.video.video import VideoFramesPath
+from nite.video_mixer.video.video_io import VideoReader, VideoStream
+from nite.video_mixer.audio.audio_io import AudioListener
 
 LOGGING_NAME = 'nite.streamer'
 logger = configure_module_logging(LOGGING_NAME)
 
 
-class VideoStream(BaseModel):
-    width: int
-    height: int
-
-
-class VideoCombiner(ProcessWithQueue):
+class VideoCombinerSong:
 
     def __init__(
                 self,
                 videos: List[VideoFramesPath],
-                video_stream: VideoStream,
-                queues: CommQueues,
-                blender: BlendWithAudio
+                blender: BlendWithSong,
+                actions: AudioActions
             ) -> None:
-        super().__init__(queues=queues)
         self.time_recorder = TimeRecorder()
         self.videos = videos
         self._validate_videos()
-        self.video_stream = video_stream
         self.ms_to_wait = self._calculate_ms_between_frames()
         self.blender = blender
+        self.actions = actions
         string_videos = ", ".join([
                                     f'Video {i_vid + 1}: {video.metadata.name}. FPS: {video.metadata.fps}'
                                     for i_vid, video in enumerate(self.videos)
                                 ])
         logger.info(
                 f"Loaded combiner. {string_videos}. "
-                f"Output resolution: {self.video_stream}. Number of videos: {len(self.videos)}. "
+                f"Number of videos: {len(self.videos)}. "
                 f"ms to wait between frames: {self.ms_to_wait}"
             )
 
     def _validate_videos(self) -> None:
         if not self.videos:
             raise ValueError("No videos to combine")
-        if len(self.videos) != 2:
-            raise NotImplementedError("For the moment we only support combining 2 videos")
+        if not (2 <= len(self.videos) <= 3):
+            raise NotImplementedError("For the moment we only support combining 2 videos and an alpha")
 
     def _calculate_ms_between_frames(self) -> int:
         sum_fps = sum([video.metadata.fps for video in self.videos])
@@ -62,24 +54,23 @@ class VideoCombiner(ProcessWithQueue):
         ms_to_wait = int(1000 / average_fps)
         return ms_to_wait
 
-    def stream(self) -> None:
+    async def stream(self) -> None:
         generators = [video.circular_frame_generator() for video in self.videos]
         logger.info("Starting stream")
         self.time_recorder.start_recording_if_not_started()
-        for frames in zip(*generators):
-            should_terminate, audio_sample = self.receive()
-            if should_terminate:
-                break
+        try:
+            for frames in zip(*generators):
+                should_blend = await self.actions.act(self.ms_to_wait)
+                frame = self.blender.blend(frames, should_blend=should_blend)
 
-            frame = self.blender.blend(audio_sample, frames)    # type: ignore
+                if self.time_recorder.has_period_passed:
+                    logger.info(f'Keep-alive. Elapsed time: {self.time_recorder.elapsed_time_str}')
 
-            if self.time_recorder.has_period_passed:
-                logger.info(f'Keep-alive. Elapsed time: {self.time_recorder.elapsed_time_str}')
-
-            cv2.imshow("frame combined", frame)
-            cv2.waitKey(self.ms_to_wait)
-        logger.info("Stream stopped")
-        cv2.destroyAllWindows()
+                cv2.imshow("frame combined", frame)
+                cv2.waitKey(self.ms_to_wait)
+        except KeyboardInterrupt:
+            logger.info("Stream stopped")
+            cv2.destroyAllWindows()
 
 
 class VideoCombinerWithAudio:
@@ -99,7 +90,7 @@ class VideoCombinerWithAudio:
                 ]
         self.video_queues = CommQueues(in_queue=queue_from_audio, out_queue=queue_to_audio)
         self.audio_queues = CommQueues(in_queue=queue_to_audio, out_queue=queue_from_audio)
-        self.video_combiner = VideoCombiner(
+        self.video_combiner = VideoCombinerSong(
             videos=videos,
             video_stream=video_stream,
             blender=blender,
@@ -129,25 +120,3 @@ class VideoCombinerWithAudio:
         self.video_queues.out_queue.cancel_join_thread()
         stream_process.join()
         audio_process.join()
-
-
-def main():
-    input_frames = [
-        '/Users/aponcedeleonch/Personal/nite/src/nite/video_mixer/bunny_video-nite_video',
-        # '/Users/aponcedeleonch/Personal/nite/src/nite/video_mixer/bunny_video-nite_video',
-        '/Users/aponcedeleonch/Personal/nite/src/nite/video_mixer/can_video-nite_video'
-    ]
-    audio_action = AudioActionRMS(audio_format=short_format, threshold=0.2)
-    audio_action_2 = AudioActionBPM(bpm=120, bpm_action_frequency=BPMActionFrequency.kick)
-    blender = BlendWithAudioPick(audio_actions=[audio_action, audio_action_2])
-    video_combiner = VideoCombinerWithAudio(
-        video_paths=input_frames,
-        video_stream=VideoStream(width=640, height=480),
-        blender=blender,
-        playback_time_sec=10
-    )
-    video_combiner.start()
-
-
-if __name__ == "__main__":
-    main()
