@@ -24,7 +24,8 @@ class VideoCombinerSong:
                 self,
                 videos: List[VideoFramesPath],
                 blender: BlendWithSong,
-                actions: AudioActions
+                actions: AudioActions,
+                blend_falloff_sec: float
             ) -> None:
         self.time_recorder = TimeRecorder()
         self.videos = videos
@@ -32,6 +33,7 @@ class VideoCombinerSong:
         self.ms_to_wait = self._calculate_ms_between_frames()
         self.blender = blender
         self.actions = actions
+        self.blend_falloff_sec = blend_falloff_sec
         string_videos = ", ".join([
                                     f'Video {i_vid + 1}: {video.metadata.name}. FPS: {video.metadata.fps}'
                                     for i_vid, video in enumerate(self.videos)
@@ -60,8 +62,8 @@ class VideoCombinerSong:
         self.time_recorder.start_recording_if_not_started()
         try:
             for frames in zip(*generators):
-                should_blend = await self.actions.act(self.ms_to_wait)
-                frame = self.blender.blend(frames, should_blend=should_blend)
+                should_blend, blend_strength = await self.actions.act(self.ms_to_wait, self.blend_falloff_sec)
+                frame = self.blender.blend(frames, should_blend=should_blend, blend_strength=blend_strength)
 
                 if self.time_recorder.has_period_passed:
                     logger.info(f'Keep-alive. Elapsed time: {self.time_recorder.elapsed_time_str}')

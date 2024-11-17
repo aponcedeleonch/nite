@@ -89,7 +89,8 @@ async def initialize_video_combiner(
                                     bpm_frequency: Optional[int],
                                     min_pitch: Optional[int],
                                     max_pitch: Optional[int],
-                                    blend_operation: str
+                                    blend_operation: str,
+                                    blend_falloff: float
                                 ) -> VideoCombinerSong:
     video_stream = intialize_stream_params(width, height)
     blender = initialize_blender(blend_operation)
@@ -98,7 +99,7 @@ async def initialize_video_combiner(
         task_init_audio_actions = tg.create_task(initialize_audio_actions(song_name, bpm_frequency, min_pitch, max_pitch))
     videos = task_init_videos.result()
     actions = task_init_audio_actions.result()
-    return VideoCombinerSong(videos, blender, actions)
+    return VideoCombinerSong(videos, blender, actions, blend_falloff)
 
 
 # Got this hack to use click with async from: https://github.com/pallets/click/issues/85
@@ -147,12 +148,16 @@ def coro(f):
     type=click.Choice(list(PITCH_CHOICES.keys())), help='The maximum pitch to act.'
 )
 @click.option(
-    '--blend-operation', required=False,
-    type=click.Choice(BLEND_MODES_CHOICES.keys()), help='The math operation to apply.'
+    '--blend-operation', required=True,
+    type=click.Choice(BLEND_MODES_CHOICES.keys()), help='The blend operation to apply.'
+)
+@click.option(
+    '--blend-falloff', required=False, default=0.0,
+    type=float, help='The blend falloff.'
 )
 @coro
 async def song_video_mixer(
-    song_name, video_1, video_2, alpha, width, height, bpm_frequency, min_pitch, max_pitch, blend_operation
+    song_name, video_1, video_2, alpha, width, height, bpm_frequency, min_pitch, max_pitch, blend_operation, blend_falloff
 ):
     video_combiner = await initialize_video_combiner(
         Path(song_name),
@@ -164,7 +169,8 @@ async def song_video_mixer(
         BPM_FREQUENCY_CHOICES.get(bpm_frequency, None),
         PITCH_CHOICES.get(min_pitch, None),
         PITCH_CHOICES.get(max_pitch, None),
-        blend_operation
+        blend_operation,
+        blend_falloff
     )
     await video_combiner.stream()
 

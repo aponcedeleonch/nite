@@ -1,13 +1,14 @@
 from abc import ABC, abstractmethod
 import asyncio
 from enum import Enum
-from typing import List
+from typing import List, Tuple
+
+import numpy as np
 
 from nite.logging import configure_module_logging
 from nite.video_mixer.audio.audio_processing import ChromaIndex, AudioSampleFeatures
 
-LOGGING_NAME = 'nite.audio_action'
-logger = configure_module_logging(LOGGING_NAME)
+logger = configure_module_logging('nite.audio_action')
 
 
 class BPMActionFrequency(int, Enum):
@@ -112,6 +113,7 @@ class AudioActions(AudioAction):
 
     def __init__(self, audio_actions: List[AudioAction]) -> None:
         self.actions = audio_actions
+        self.time_since_last_action_ms = np.inf
 
     def set_features(self, audio_sample_features: AudioSampleFeatures) -> None:
         for action in self.actions:
@@ -120,11 +122,25 @@ class AudioActions(AudioAction):
             elif isinstance(action, AudioActionPitch):
                 action.set_pitches(audio_sample_features.pitches)
 
-    async def act(self, time_in_ms: int) -> bool:
+    async def act(self, time_in_ms: int, blend_falloff_sec: float) -> Tuple[bool, float]:
         tasks = []
         async with asyncio.TaskGroup() as tg:
             for action in self.actions:
                 tasks.append(tg.create_task(action.act(time_in_ms)))
 
-        results = [task.result() for task in tasks]
-        return any(results)
+        should_blend_per_action = [task.result() for task in tasks]
+        should_blend = any(should_blend_per_action)
+
+        if should_blend:
+            self.time_since_last_action_ms = 0
+            blend_strength = 1.0
+        else:
+            self.time_since_last_action_ms += time_in_ms
+            if blend_falloff_sec == 0:
+                return False, 0.0
+            blend_falloff_ms = blend_falloff_sec * 1000
+            # Calculate blend strength based on blend_falloff_sec
+            blend_strength = max(0.0, 1.0 - (self.time_since_last_action_ms / blend_falloff_ms))
+            should_blend = blend_strength > 0.0
+
+        return should_blend, blend_strength
