@@ -113,52 +113,92 @@ def coro(f):
 @click.command()
 @click.option(
     '--song-name', required=True,
-    type=click.Path(exists=True, dir_okay=False), help='The song to process.'
+    type=click.Path(exists=True, dir_okay=False),
+    help=(
+        'The path to the audio file (song) to process. The command will analyze this song to extract audio features like BPM '
+        'and pitch for synchronization with the videos.'
+    )
 )
 @click.option(
     '--video-1', required=True,
-    type=click.Path(exists=True, dir_okay=False), help='The video 1 to mix.'
+    type=click.Path(exists=True, dir_okay=False),
+    help='The path to the first video file to mix. This video acts as the base layer.'
 )
 @click.option(
     '--video-2', required=True,
-    type=click.Path(exists=True, dir_okay=False), help='The video 2 to mix.'
+    type=click.Path(exists=True, dir_okay=False),
+    help=(
+        'The path to the second video file to mix. This video acts as the blend layer, which will be blended over the '
+        'base layer.'
+    )
 )
 @click.option(
     '--alpha', required=True,
-    type=click.Path(exists=True, dir_okay=False), help='The alpha to use over video 2.'
+    type=click.Path(exists=True, dir_okay=False),
+    help='The path to the alpha channel file, which determines the transparency of the blend layer over the base layer.'
 )
 @click.option(
     '--width', required=False,
-    type=int, default=640, help='The width of the video.'
+    type=int, default=640, help='The width of the output video. Default is 640.'
 )
 @click.option(
     '--height', required=False,
-    type=int, default=480, help='The height of the video.'
+    type=int, default=480, help='The height of the output video. Default is 480.'
 )
 @click.option(
     '--bpm-frequency', required=False,
-    type=click.Choice(list(BPM_FREQUENCY_CHOICES.keys())), help='The BPM frequency.'
+    type=click.Choice(list(BPM_FREQUENCY_CHOICES.keys())),
+    help='The BPM frequency to act on. This allows the video blending to be synchronized with the beat of the song.'
 )
 @click.option(
     '--min-pitch', required=False,
-    type=click.Choice(list(PITCH_CHOICES.keys())), help='The minimum pitch to act.'
+    type=click.Choice(list(PITCH_CHOICES.keys())),
+    help='The minimum pitch to act on. This parameter must be used in conjunction with --max-pitch.'
 )
 @click.option(
     '--max-pitch', required=False,
-    type=click.Choice(list(PITCH_CHOICES.keys())), help='The maximum pitch to act.'
+    type=click.Choice(list(PITCH_CHOICES.keys())),
+    help='The maximum pitch to act on. This parameter must be used in conjunction with --min-pitch.'
 )
 @click.option(
     '--blend-operation', required=True,
-    type=click.Choice(BLEND_MODES_CHOICES.keys()), help='The blend operation to apply.'
+    type=click.Choice(BLEND_MODES_CHOICES.keys()),
+    help='The blend operation to apply between the base and blend layers.'
 )
 @click.option(
     '--blend-falloff', required=False, default=0.0,
-    type=float, help='The blend falloff.'
+    type=float,
+    help=(
+        'The blend falloff time in seconds. This determines how quickly the blend effect transitions between '
+        'the base and blend layers. Default is 0.0.'
+    )
 )
 @coro
 async def song_video_mixer(
     song_name, video_1, video_2, alpha, width, height, bpm_frequency, min_pitch, max_pitch, blend_operation, blend_falloff
 ):
+    """
+    The song_video_mixer command is designed to mix two video files with an alpha channel using audio-driven effects.
+    It allows you to synchronize video mixing with audio features such as BPM (Beats Per Minute) and pitch.
+
+    \b
+    Example:
+    python song_video_mixer.py \\
+        --song-name ./music.mp3 \\
+        --video-1 ./video1.mp4 \\
+        --video-2 ./video2.mp4 \\
+        --alpha ./alpha.png \\
+        --width 1280 \\
+        --height 720 \\
+        --bpm-frequency kick \\
+        --blend-operation add \\
+        --blend-falloff 2.0
+
+    This example will mix video1.mp4 and video2.mp4 using the alpha channel alpha.mp4,
+    with the output video dimensions set to 1280x720. The mixing will be synchronized with the BPM of music.mp3,
+    and the blend operation will use the OVERLAY mode with a falloff time of 2.0 seconds.
+    The pitch range for synchronization will be between 48 and 72.
+    """
     video_combiner = await initialize_video_combiner(
         Path(song_name),
         Path(video_1),
