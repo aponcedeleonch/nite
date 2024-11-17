@@ -92,9 +92,12 @@ async def initialize_video_combiner(
                                     blend_operation: str
                                 ) -> VideoCombinerSong:
     video_stream = intialize_stream_params(width, height)
-    videos = await initialize_videos(video_1, video_2, alpha, video_stream)
     blender = initialize_blender(blend_operation)
-    actions = await initialize_audio_actions(song_name, bpm_frequency, min_pitch, max_pitch)
+    async with asyncio.TaskGroup() as tg:
+        task_init_videos = tg.create_task(initialize_videos(video_1, video_2, alpha, video_stream))
+        task_init_audio_actions = tg.create_task(initialize_audio_actions(song_name, bpm_frequency, min_pitch, max_pitch))
+    videos = task_init_videos.result()
+    actions = task_init_audio_actions.result()
     return VideoCombinerSong(videos, blender, actions)
 
 
