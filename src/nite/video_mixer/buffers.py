@@ -11,6 +11,11 @@ logger = configure_module_logging("nite.buffers")
 
 
 class Buffer(ABC):
+    @property
+    @abstractmethod
+    def buffered_data(self) -> np.ndarray:
+        pass
+
     @abstractmethod
     def has_enough_data(self) -> bool:
         pass
@@ -53,7 +58,8 @@ class TimedSampleBuffer(Buffer):
         self.buffer = np.zeros((self.buffer_cap_per_sec, 1))
         self.num_samples_per_second = np.zeros(1, dtype=int)
 
-    def __call__(self) -> np.ndarray:
+    @property
+    def buffered_data(self) -> np.ndarray:
         # To make sure we do not have more information than needed in the buffer
         self._rotate_buffers()
 
@@ -127,7 +133,8 @@ class SampleBuffer(Buffer):
         self.min_buffer_size = min_buffer_size
         self.samples_to_remove = num_samples_remove
 
-    def __call__(self) -> np.ndarray:
+    @property
+    def buffered_data(self) -> np.ndarray:
         return self.buffer
 
     def has_enough_data(self) -> bool:

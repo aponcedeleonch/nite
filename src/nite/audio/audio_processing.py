@@ -47,7 +47,7 @@ class BPMDetector(Detector):
         buffer_audio: Buffer = SampleBuffer(),
         buffer_recorded_bpms: Buffer = SampleBuffer(),
         tolerance_threshold: int = 10,
-        sampling_rate: int = AUDIO_SAMPLING_RATE,
+        sampling_rate: float = AUDIO_SAMPLING_RATE,
         reset_after_prediction: bool = False,
     ) -> None:
         self.tolerance_threshold = tolerance_threshold
@@ -56,14 +56,16 @@ class BPMDetector(Detector):
         self.sampling_rate = sampling_rate
         self.reset_after_prediction = reset_after_prediction
 
-    def _has_bpm_changed_significantly(self, last_recorded_bpm: float) -> bool:
+    def _has_bpm_changed_significantly(self, last_recorded_bpm: np.ndarray) -> bool:
         if not self.buffer_recorded_bpms.has_enough_data():
             return False
 
-        if len(self.buffer_recorded_bpms()) == 0:
+        if len(self.buffer_recorded_bpms.buffered_data) == 0:
             return False
 
-        distance_to_buffered_bpms = np.abs(last_recorded_bpm - self.buffer_recorded_bpms())
+        distance_to_buffered_bpms = np.abs(
+            last_recorded_bpm - self.buffer_recorded_bpms.buffered_data
+        )
         avg_distance_to_buffered_bpms = np.mean(distance_to_buffered_bpms)
         has_bpm_changed = avg_distance_to_buffered_bpms > self.tolerance_threshold
         return has_bpm_changed
@@ -71,16 +73,16 @@ class BPMDetector(Detector):
     def _get_avg_recorded_bpms(self) -> Optional[float]:
         if not self.buffer_recorded_bpms.has_enough_data():
             return None
-        return np.mean(self.buffer_recorded_bpms())
+        return np.mean(self.buffer_recorded_bpms.buffered_data)
 
     def _get_estimated_bpm(self) -> Optional[np.ndarray]:
         if not self.buffer_audio.has_enough_data():
             return None
 
         # Using this provides a more accurate BPM estimation on longer tracks but is very slow.
-        # _, audio_sample_percussive = librosa.effects.hpss(self.buffer_audio())
+        # _, audio_sample_percussive = librosa.effects.hpss(self.buffer_audio.buffered_data)
         last_recorded_bpm, _ = librosa.beat.beat_track(
-            y=self.buffer_audio(), sr=self.sampling_rate, start_bpm=120
+            y=self.buffer_audio.buffered_data, sr=self.sampling_rate, start_bpm=120
         )
         if isinstance(last_recorded_bpm, np.ndarray):
             if len(last_recorded_bpm) != 1:
@@ -122,7 +124,7 @@ class PitchDetector(Detector):
     def __init__(
         self,
         buffer_audio: Buffer = SampleBuffer(),
-        sampling_rate: int = AUDIO_SAMPLING_RATE,
+        sampling_rate: float = AUDIO_SAMPLING_RATE,
         reset_after_prediction: bool = False,
         should_return_latest: bool = False,
         hop_length: int = 512,
@@ -135,7 +137,7 @@ class PitchDetector(Detector):
 
     def _get_chromogram(self) -> np.ndarray:
         estimated_chromogram = librosa.feature.chroma_stft(
-            y=self.buffer_audio(), sr=self.sampling_rate, hop_length=self.hop_length
+            y=self.buffer_audio.buffered_data, sr=self.sampling_rate, hop_length=self.hop_length
         )
         if self.should_return_latest:
             return estimated_chromogram[:, -1].reshape(-1, 1)
@@ -183,7 +185,7 @@ class AudioProcessor:
         self.bpm_detector = bpm_detector
         self.pitch_detector = pitch_detector
 
-    def set_sampling_rate(self, sampling_rate: int) -> None:
+    def set_sampling_rate(self, sampling_rate: float) -> None:
         if self.bpm_detector is not None:
             self.bpm_detector.sampling_rate = sampling_rate
         if self.pitch_detector is not None:

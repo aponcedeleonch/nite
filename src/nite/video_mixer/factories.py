@@ -7,6 +7,7 @@ from typing import List, Optional, Tuple
 import nite.config as nite_config
 from nite.audio.audio import short_format
 from nite.audio.audio_action import (
+    AudioAction,
     AudioActionBPM,
     AudioActionPitch,
     AudioActions,
@@ -45,10 +46,12 @@ class NiteFactory(ABC):
 
 
 class BPMDetectorFactory(NiteFactory):
-    def __init__(self, sample_rate: int):
+    def __init__(self, sample_rate: Optional[int]):
         self.sample_rate = sample_rate
 
     async def get_stream_config(self) -> BPMDetector:
+        if self.sample_rate is None:
+            raise InitMixerError("Sample rate must be set when initializing audio stream.")
         buffer_audio = SampleBuffer(
             min_buffer_size=nite_config.BPM_BUFFER_SECONDS_MIN * self.sample_rate,
             max_buffer_size=nite_config.BPM_BUFFER_SECONDS_MAX * self.sample_rate,
@@ -69,10 +72,12 @@ class BPMDetectorFactory(NiteFactory):
 
 
 class PitchDetectorFactory(NiteFactory):
-    def __init__(self, sample_rate: int):
+    def __init__(self, sample_rate: Optional[int]):
         self.sample_rate = sample_rate
 
     async def get_stream_config(self) -> PitchDetector:
+        if self.sample_rate is None:
+            raise InitMixerError("Sample rate must be set when initializing audio stream.")
         # For the moment we are using the same buffer values as BPM. We need to investigate
         # and see if we need to change these values.
         buffer_audio = SampleBuffer(
@@ -125,7 +130,7 @@ class AudioFactory(NiteFactory):
             raise InitMixerError("Both min_pitch and max_pitch must be set.")
 
     def _init_audio_actions(self) -> AudioActions:
-        actions = []
+        actions: List[AudioAction] = []
         if self.bpm_action is not None:
             actions.append(self.bpm_action)
         if self.pitch_action is not None:
@@ -275,8 +280,8 @@ class VideoCombinerFactory:
     async def get_stream_config(self) -> VideoCombinerAudioListenerQueue:
         if self.playback_time_sec is None:
             raise InitMixerError("Playback time must be set when initializing video stream.")
-        queue_to_video = Queue()
-        queue_to_audio = Queue()
+        queue_to_video: Queue = Queue()
+        queue_to_audio: Queue = Queue()
         queue_handler_video = QueueHandler(in_queue=queue_to_video, out_queue=queue_to_audio)
         queue_handler_audio = QueueHandler(in_queue=queue_to_audio, out_queue=queue_to_video)
         video_factory = VideoFactory(

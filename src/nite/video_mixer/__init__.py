@@ -15,6 +15,14 @@ LOGGING_NAME = "nite.video_mixer"
 logger = configure_module_logging(LOGGING_NAME)
 
 
+class TimeRecorderError(Exception):
+    pass
+
+
+class QueueHandlerError(Exception):
+    pass
+
+
 class TimeRecorder(BaseModel):
     start_time: Optional[float] = None
     time_from_last_timeout: Optional[float] = None
@@ -67,6 +75,8 @@ class TimeRecorder(BaseModel):
     def elapsed_time_in_ms_since_last_asked(self) -> float:
         new_time_asked = time.time()
         if self.time_from_last_asked is None:
+            if self.start_time is None:
+                raise TimeRecorderError("TimeRecorder has not started recording time")
             self.time_from_last_asked = self.start_time
         elapsed_time = new_time_asked - self.time_from_last_asked
         self.time_from_last_asked = new_time_asked
@@ -157,6 +167,10 @@ class QueueHandler:
             return False, 0.0
 
         if message_obj.content_type == MessageConentType.blend_strength:
+            if not isinstance(message_obj.content, float):
+                raise QueueHandlerError(
+                    "Message content must be a float as content_type is blend_strength"
+                )
             return False, message_obj.content
 
         if message_obj.content_type == MessageConentType.message:

@@ -73,7 +73,9 @@ class VideoCombinerSong(VideoCombiner):
             for frames in zip(*generators):
                 should_blend, blend_strength = asyncio.run(self.actions.act(self.ms_to_wait))
                 frame = self.blender.blend(
-                    frames, should_blend=should_blend, blend_strength=blend_strength
+                    frames,  # type: ignore[arg-type]
+                    should_blend=should_blend,
+                    blend_strength=blend_strength,
                 )
 
                 if self.time_recorder.has_period_passed:
@@ -112,7 +114,9 @@ class VideoCombinerQueue(VideoCombiner):
                 should_blend = False
                 blend_strength = 0
             frame = self.blender.blend(
-                frames, should_blend=should_blend, blend_strength=blend_strength
+                frames,  # type: ignore[arg-type]
+                should_blend=should_blend,
+                blend_strength=blend_strength,
             )
 
             if self.time_recorder.has_period_passed:

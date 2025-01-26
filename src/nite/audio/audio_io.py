@@ -1,5 +1,6 @@
 import asyncio
 import struct
+from pathlib import Path
 
 import librosa
 import numpy as np
@@ -7,7 +8,7 @@ import pyaudio
 
 from nite.audio.audio import AudioFormat, short_format
 from nite.audio.audio_action import AudioActions
-from nite.audio.audio_processing import AudioProcessor
+from nite.audio.audio_processing import AudioProcessor, AudioSampleFeatures
 from nite.config import AUDIO_CHANNELS, AUDIO_SAMPLING_RATE
 from nite.logging import configure_module_logging
 from nite.video_mixer import QueueHandler, TimeRecorder
@@ -35,7 +36,7 @@ class AudioListener:
         self.time_recorder = TimeRecorder()
         logger.info(f"Loaded audio listener. Format: {self.audio_format}")
 
-    async def _get_audio_sample_features(self, audio_sample: np.ndarray) -> bool:
+    async def _get_audio_sample_features(self, audio_sample: np.ndarray) -> AudioSampleFeatures:
         audio_sample_features = await self.audio_processor.process_audio_sample(audio_sample)
         return audio_sample_features
 
@@ -82,7 +83,7 @@ class AudioAnalyzerSong:
     def __init__(self, audio_processor: AudioProcessor) -> None:
         self.audio_processor = audio_processor
 
-    async def analyze_song(self, song_path: str) -> None:
+    async def analyze_song(self, song_path: Path) -> AudioSampleFeatures:
         audio_sample, sampling_rate = librosa.load(song_path)
         self.audio_processor.set_sampling_rate(sampling_rate)
         audio_features = await self.audio_processor.process_audio_sample(audio_sample)

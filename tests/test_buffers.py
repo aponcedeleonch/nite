@@ -43,7 +43,7 @@ def test_reset_buffer():
     assert timed_sample_buffer.buffer.shape == (AUDIO_SAMPLING_RATE, 1)
     assert len(timed_sample_buffer.num_samples_per_second) == 1
     assert timed_sample_buffer.num_samples_per_second[0] == 0
-    assert np.allclose(timed_sample_buffer(), 0)
+    assert np.allclose(timed_sample_buffer.buffered_data, 0)
 
 
 def test_add_sample_to_buffer():
@@ -55,7 +55,7 @@ def test_add_sample_to_buffer():
 
     assert timed_sample_buffer.num_samples_per_second[-1] == len(sample)
     assert np.array_equal(timed_sample_buffer.buffer[: len(sample), -1], sample)
-    assert np.array_equal(timed_sample_buffer(), sample)
+    assert np.array_equal(timed_sample_buffer.buffered_data, sample)
 
 
 def test_add_two_samples_same_second():
@@ -66,7 +66,7 @@ def test_add_two_samples_same_second():
     timed_sample_buffer.add_sample_to_buffer(sample_1)
     assert timed_sample_buffer.num_samples_per_second[-1] == len(sample_1)
     assert np.array_equal(timed_sample_buffer.buffer[: len(sample_1), -1], sample_1)
-    assert np.array_equal(timed_sample_buffer(), sample_1)
+    assert np.array_equal(timed_sample_buffer.buffered_data, sample_1)
 
     sample_2 = np.ones(20)
     timed_sample_buffer.add_sample_to_buffer(sample_2)
@@ -77,7 +77,7 @@ def test_add_two_samples_same_second():
         timed_sample_buffer.buffer[len(sample_1) : len(sample_1) + len(sample_2), -1],
         sample_2,
     )
-    assert np.array_equal(timed_sample_buffer(), np.concatenate([sample_1, sample_2]))
+    assert np.array_equal(timed_sample_buffer.buffered_data, np.concatenate([sample_1, sample_2]))
 
 
 def test_overflow_buffer():
@@ -91,14 +91,14 @@ def test_overflow_buffer():
 
     assert timed_sample_buffer.num_samples_per_second[-1] == len(sample)
     assert np.array_equal(timed_sample_buffer.buffer[: len(sample), -1], sample)
-    assert np.array_equal(timed_sample_buffer(), sample)
+    assert np.array_equal(timed_sample_buffer.buffered_data, sample)
 
     sample_overflow = np.ones(10) + 1
     timed_sample_buffer.add_sample_to_buffer(sample_overflow)
 
     assert timed_sample_buffer.num_samples_per_second[-1] == len(sample)
     assert np.array_equal(timed_sample_buffer.buffer[: len(sample), -1], sample)
-    assert np.array_equal(timed_sample_buffer(), sample)
+    assert np.array_equal(timed_sample_buffer.buffered_data, sample)
 
 
 def test_add_sample_to_buffer_with_period_passed_and_empty_first_second():
@@ -115,7 +115,7 @@ def test_add_sample_to_buffer_with_period_passed_and_empty_first_second():
 
     assert timed_sample_buffer.num_samples_per_second[-1] == len(sample)
     assert np.array_equal(timed_sample_buffer.buffer[: len(sample), -1], sample)
-    assert np.array_equal(timed_sample_buffer(), sample)
+    assert np.array_equal(timed_sample_buffer.buffered_data, sample)
 
 
 def test_add_sample_to_buffer_with_period_passed():
@@ -126,7 +126,7 @@ def test_add_sample_to_buffer_with_period_passed():
     timed_sample_buffer.add_sample_to_buffer(sample_1)
     assert timed_sample_buffer.num_samples_per_second[-1] == len(sample_1)
     assert np.array_equal(timed_sample_buffer.buffer[: len(sample_1), -1], sample_1)
-    assert np.array_equal(timed_sample_buffer(), sample_1)
+    assert np.array_equal(timed_sample_buffer.buffered_data, sample_1)
 
     timed_sample_buffer.timer_buffer.simulate_period_passed()
 
@@ -138,7 +138,7 @@ def test_add_sample_to_buffer_with_period_passed():
     assert timed_sample_buffer.num_samples_per_second[-1] == len(sample_2)
     assert np.array_equal(timed_sample_buffer.buffer[: len(sample_2), -1], sample_2)
 
-    assert np.array_equal(timed_sample_buffer(), np.concatenate([sample_1, sample_2]))
+    assert np.array_equal(timed_sample_buffer.buffered_data, np.concatenate([sample_1, sample_2]))
 
 
 @pytest.mark.parametrize("min_seconds_in_buffer", [0, 1, 10])
@@ -177,7 +177,7 @@ def test_rotate_buffer(max_seconds_in_buffer):
 
     assert timed_sample_buffer.num_samples_per_second[-1] == len(sample)
     assert np.array_equal(timed_sample_buffer.buffer[: len(sample), -1], sample)
-    assert np.array_equal(timed_sample_buffer(), sample)
+    assert np.array_equal(timed_sample_buffer.buffered_data, sample)
 
     for i_sec in range(max_seconds_in_buffer + 1):
         timed_sample_buffer.timer_buffer.simulate_period_passed()
@@ -254,8 +254,8 @@ def test_reset_buffer_sample_buffer(sample_buffer):
     assert sample_buffer.buffer.shape == (0,)
 
 
-def test_call(sample_buffer):
+def test_buffered_data(sample_buffer):
     sample = np.ones(3)  # Add 3 samples
     sample_buffer.add_sample_to_buffer(sample)
 
-    assert np.array_equal(sample_buffer(), sample)
+    assert np.array_equal(sample_buffer.buffered_data, sample)

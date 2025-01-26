@@ -76,7 +76,7 @@ BLEND_MODES_CHOICES = {member.name: member.value for member in BlendModes}
 @click.option(
     "--blend-operation",
     required=True,
-    type=click.Choice(BLEND_MODES_CHOICES.keys()),
+    type=click.Choice(list(BLEND_MODES_CHOICES.keys())),
     help="The blend operation to apply between the base and blend layers.",
 )
 @click.option(

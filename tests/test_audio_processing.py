@@ -32,7 +32,8 @@ class MockBuffer:
     def has_enough_data(self):
         return self.has_enough_data_flag
 
-    def __call__(self):
+    @property
+    def buffered_data(self):
         return np.array(self.data).reshape(-1)
 
 

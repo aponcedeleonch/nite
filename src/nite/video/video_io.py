@@ -14,9 +14,13 @@ from nite.video.video import VideoFrames, VideoFramesImg, VideoFramesPath, Video
 logger = configure_module_logging("nite.video_io")
 
 
+class FramesNotFoundError(Exception):
+    pass
+
+
 class VideoReader:
-    def _read_metadata_from_video(self, input_video: str) -> VideoMetadata:
-        video_capture = cv2.VideoCapture(input_video)
+    def _read_metadata_from_video(self, input_video: Path) -> VideoMetadata:
+        video_capture = cv2.VideoCapture(str(input_video))
         num_frames = video_capture.get(cv2.CAP_PROP_FRAME_COUNT)
         fps = video_capture.get(cv2.CAP_PROP_FPS)
         width = int(video_capture.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -47,10 +51,10 @@ class VideoReader:
         logger.info(f"Metadata read from JSON {metadata.name}. Metadata: {metadata}")
         return metadata
 
-    async def from_video(self, input_video: str) -> VideoFramesImg:
+    async def from_video(self, input_video: Path) -> VideoFramesImg:
         start_time = time.time()
         metadata = self._read_metadata_from_video(input_video)
-        video_capture = cv2.VideoCapture(input_video)
+        video_capture = cv2.VideoCapture(str(input_video))
         frame_count = 0
         frames_imgs = []
         logger.info(
@@ -74,7 +78,7 @@ class VideoReader:
         return VideoFramesImg(metadata=metadata, frames_imgs=frames_imgs)
 
     async def from_frames(
-        self, input_frames_dir: str, width: int, height: int, is_alpha: bool = False
+        self, input_frames_dir: Path, width: int, height: int, is_alpha: bool = False
     ) -> VideoFramesPath:
         base_frames_dir = Path(input_frames_dir)
         if not base_frames_dir.is_dir():
@@ -123,7 +127,7 @@ class VideoReader:
 
 
 class VideoWriter:
-    def __init__(self, video: VideoFrames, output_base_dir: Optional[str] = None) -> None:
+    def __init__(self, video: VideoFrames, output_base_dir: Optional[Path] = None) -> None:
         self.video = video
         if not output_base_dir:
             output_base_dir_path = Path(".")
@@ -170,7 +174,7 @@ class NiteVideo:
     def __init__(self, video_path: Path, video_stream: VideoStream, is_alpha: bool = False) -> None:
         self.video_path = video_path
         self.video_stream = video_stream
-        self.video_frames_path = None
+        self.video_frames_path: Optional[VideoFramesPath] = None
         self.is_alpha = is_alpha
 
     async def __call__(self) -> VideoFramesPath:
@@ -194,7 +198,7 @@ class NiteVideo:
             )
             return video_frames_paths
         except FileNotFoundError:
-            return None
+            raise FramesNotFoundError(f"Frames not found at {self.frames_path}")
 
     async def _try_to_load_video(self) -> None:
         output_video_path = Path(VIDEO_LOCATION)
@@ -203,9 +207,11 @@ class NiteVideo:
         await video_writer.to_frames()
 
     async def load_video(self) -> VideoFramesPath:
-        video_frames = await self._try_to_load_frames()
-        if video_frames:
+        try:
+            video_frames = await self._try_to_load_frames()
             return video_frames
+        except FramesNotFoundError:
+            logger.info(f"Frames not found at {self.frames_path}. Loading video...")
 
         await self._try_to_load_video()
         return await self._try_to_load_frames()
