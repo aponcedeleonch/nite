@@ -1,40 +1,43 @@
 import itertools
+from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import List
-from abc import ABC, abstractmethod
 
-from pydantic import BaseModel, computed_field
 import cv2
+from pydantic import BaseModel, computed_field
 
 from nite.config import METADATA_FILENAME
 from nite.logging import configure_module_logging
 
-logger = configure_module_logging('nite.video')
+logger = configure_module_logging("nite.video")
 
 
 class VideoMetadata(BaseModel):
     name: str
     num_frames: float
     fps: float
-    extension: str = 'mp4'
+    extension: str = "mp4"
     width: int = 0
     height: int = 0
 
     @computed_field  # type: ignore[misc]
     @property
     def zero_padding(self) -> int:
-        num_frames_int = int(self.num_frames) if int(self.num_frames) == self.num_frames else int(self.num_frames) + 1
+        num_frames_int = (
+            int(self.num_frames)
+            if int(self.num_frames) == self.num_frames
+            else int(self.num_frames) + 1
+        )
         return len(str(num_frames_int))
 
     def to_json(self, output_dir: Path) -> None:
         metadata_file = output_dir / METADATA_FILENAME
-        with open(metadata_file, 'w') as file:
+        with open(metadata_file, "w") as file:
             file.write(self.model_dump_json())
-        logger.info(f'Metadata of video {self.name} written to {metadata_file}')
+        logger.info(f"Metadata of video {self.name} written to {metadata_file}")
 
 
 class VideoFrames(ABC):
-
     def __init__(self, metadata: VideoMetadata) -> None:
         self.metadata = metadata
 
@@ -56,7 +59,6 @@ class VideoFrames(ABC):
 
 
 class VideoFramesImg(VideoFrames):
-
     def __init__(self, metadata: VideoMetadata, frames_imgs: List[cv2.typing.MatLike]) -> None:
         super().__init__(metadata)
         self.frames_imgs = frames_imgs
@@ -79,7 +81,6 @@ class VideoFramesImg(VideoFrames):
 
 
 class VideoFramesPath(VideoFrames):
-
     def __init__(self, metadata: VideoMetadata, image_frames_dir: Path) -> None:
         super().__init__(metadata)
         self.frames_paths = self.get_frame_paths_from_dir(image_frames_dir)
@@ -93,9 +94,9 @@ class VideoFramesPath(VideoFrames):
     def resize_frames(self, width: int, height: int):
         super().resize_frames(width, height)
         frames_base_path = Path(self.frames_paths[0]).parents[1]
-        frames_base_path_resized = frames_base_path / f'{width}x{height}'
+        frames_base_path_resized = frames_base_path / f"{width}x{height}"
         if frames_base_path_resized.is_dir():
-            logger.info(f'Frames directory found with resolution {width}x{height}. Not resizing.')
+            logger.info(f"Frames directory found with resolution {width}x{height}. Not resizing.")
             self.frames_paths = self.get_frame_paths_from_dir(frames_base_path_resized)
             return
 
@@ -114,9 +115,9 @@ class VideoFramesPath(VideoFrames):
 
     def convert_to_alpha(self) -> None:
         frames_base_path = Path(self.frames_paths[0]).parent
-        frames_base_path_alpha = frames_base_path / 'alpha'
+        frames_base_path_alpha = frames_base_path / "alpha"
         if frames_base_path_alpha.is_dir():
-            logger.info('Frames directory found with alpha channel. Not converting.')
+            logger.info("Frames directory found with alpha channel. Not converting.")
             self.frames_paths = self.get_frame_paths_from_dir(frames_base_path_alpha)
             return
 
@@ -133,8 +134,13 @@ class VideoFramesPath(VideoFrames):
         logger.info(f"Converted frames of {self.metadata.name} to alpha channel.")
 
     def get_frame_paths_from_dir(self, image_frames_dir: Path) -> List[Path]:
-        logger.info(f'Frames of {self.metadata.name} read from {image_frames_dir}')
-        return list(sorted(image_frames_dir.glob('*.png'), key=lambda x: x.stem[self.metadata.zero_padding:]))
+        logger.info(f"Frames of {self.metadata.name} read from {image_frames_dir}")
+        return list(
+            sorted(
+                image_frames_dir.glob("*.png"),
+                key=lambda x: x.stem[self.metadata.zero_padding :],
+            )
+        )
 
     @property
     def frame_as_img(self):

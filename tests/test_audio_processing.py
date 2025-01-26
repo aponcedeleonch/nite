@@ -1,12 +1,20 @@
+import librosa
 import numpy as np
 import pytest
-import librosa
 
 from nite.config import (
-    AUDIO_SAMPLING_RATE, BPM_BUFFER_SECONDS_MIN, BPM_BUFFER_SECONDS_MAX, BPM_BUFFER_BPMS_MIN, BPM_BUFFER_BPMS_MAX,
-    BPM_BUFFER_SECS_REMOVE
+    AUDIO_SAMPLING_RATE,
+    BPM_BUFFER_BPMS_MAX,
+    BPM_BUFFER_BPMS_MIN,
+    BPM_BUFFER_SECONDS_MAX,
+    BPM_BUFFER_SECONDS_MIN,
+    BPM_BUFFER_SECS_REMOVE,
 )
-from nite.video_mixer.audio.audio_processing import BPMDetector, PitchDetector, ChromaIndex
+from nite.video_mixer.audio.audio_processing import (
+    BPMDetector,
+    ChromaIndex,
+    PitchDetector,
+)
 from nite.video_mixer.buffers import SampleBuffer
 
 
@@ -41,7 +49,7 @@ def test_initial_state(bpm_detecter: BPMDetector):
     assert isinstance(bpm_detecter.buffer_recorded_bpms, MockBuffer)
 
 
-@pytest.mark.parametrize('has_enough_data', [True, False])
+@pytest.mark.parametrize("has_enough_data", [True, False])
 def test_has_bpm_changed_significantly(bpm_detecter: BPMDetector, has_enough_data: bool):
     bpm_detecter.buffer_recorded_bpms.has_enough_data_flag = has_enough_data
 
@@ -56,7 +64,7 @@ def test_has_bpm_changed_significantly(bpm_detecter: BPMDetector, has_enough_dat
         assert not bpm_detecter._has_bpm_changed_significantly(105)
 
 
-@pytest.mark.parametrize('has_enough_data', [True, False])
+@pytest.mark.parametrize("has_enough_data", [True, False])
 def test_get_avg_recorded_bpms(bpm_detecter: BPMDetector, has_enough_data: bool):
     bpm_detecter.buffer_recorded_bpms.has_enough_data_flag = has_enough_data
 
@@ -70,7 +78,7 @@ def test_get_avg_recorded_bpms(bpm_detecter: BPMDetector, has_enough_data: bool)
         assert bpm_detecter._get_avg_recorded_bpms() == 105
 
 
-@pytest.mark.parametrize('has_enough_data', [True, False])
+@pytest.mark.parametrize("has_enough_data", [True, False])
 def test_get_estimated_bpm(bpm_detecter: BPMDetector, has_enough_data: bool):
     audio_sample = np.random.randn(AUDIO_SAMPLING_RATE)  # 1 second of random audio
     bpm_detecter.buffer_audio.add_sample_to_buffer(audio_sample)
@@ -100,31 +108,38 @@ async def test_detect_bpm(bpm_detecter: BPMDetector):
 # _, beats = librosa.beat.beat_track(y=y, sr=sr)
 # _, beats_cleaned = librosa.beat.beat_track(y=audio_sample_percussive, sr=sr)
 @pytest.mark.asyncio
-@pytest.mark.parametrize('librosa_file, expected_bpm', [
-    ('choice', 135.99),
-    ('brahms', 151.99),
-    ('pistachio', 143.55),
-    ('fishin', 117.45),
-    # ('nutcracker', 107.66),   # This track has very low BPM. For the moment skipping it. We can add it later
-    # ('trumpet', 184.57),  # This track is 5.3 seconds. Too short for tests
-    ('sweetwaltz', 151.99)
-])
+@pytest.mark.parametrize(
+    "librosa_file, expected_bpm",
+    [
+        ("choice", 135.99),
+        ("brahms", 151.99),
+        ("pistachio", 143.55),
+        ("fishin", 117.45),
+        # ('nutcracker', 107.66),   # This track has very low BPM. For the moment skipping it.
+        # ('trumpet', 184.57),  # This track is 5.3 seconds. Too short for tests
+        ("sweetwaltz", 151.99),
+    ],
+)
 async def test_unmocked_detect_bpm(librosa_file: BPMDetector, expected_bpm: int):
     audio_array, sample_rate = librosa.load(librosa.ex(librosa_file))
     min_seconds, max_seconds = BPM_BUFFER_SECONDS_MIN, BPM_BUFFER_SECONDS_MAX
     min_bpms, max_bpms = BPM_BUFFER_BPMS_MIN, BPM_BUFFER_BPMS_MAX
     num_secs_remove = BPM_BUFFER_SECS_REMOVE
     buffer_audio = SampleBuffer(
-                                min_buffer_size=min_seconds * sample_rate,
-                                max_buffer_size=max_seconds * sample_rate,
-                                num_samples_remove=num_secs_remove * sample_rate
-                            )
+        min_buffer_size=min_seconds * sample_rate,
+        max_buffer_size=max_seconds * sample_rate,
+        num_samples_remove=num_secs_remove * sample_rate,
+    )
     buffer_recorded_bpms = SampleBuffer(min_buffer_size=min_bpms, max_buffer_size=max_bpms)
-    bpm_detecter = BPMDetector(buffer_audio=buffer_audio, buffer_recorded_bpms=buffer_recorded_bpms, sampling_rate=sample_rate)
+    bpm_detecter = BPMDetector(
+        buffer_audio=buffer_audio,
+        buffer_recorded_bpms=buffer_recorded_bpms,
+        sampling_rate=sample_rate,
+    )
 
     correct_bpm_detected = []
     for i in range(0, len(audio_array), sample_rate):
-        audio_sample = audio_array[i:i + sample_rate]
+        audio_sample = audio_array[i : i + sample_rate]
         detected_bpm = await bpm_detecter.detect(audio_sample)
         if detected_bpm is not None:
             correct_bpm_detected.append(np.isclose(detected_bpm, expected_bpm, atol=1e-2))

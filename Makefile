@@ -1,37 +1,23 @@
-.PHONY: install, clean, typecheck, lint, test-setup, test-cleaning, start, start-dev
+.PHONY: install, clean, typecheck, lint, format
 
-VENV?=venv
+# Expected to be a path set by the user
+VENV?=~/py_venvs/nite_env
 
 install:
 	python3.12 -m venv ${VENV};
-	source ./${VENV}/bin/activate; \
+	source ${VENV}/bin/activate; \
 	pip install --upgrade pip; \
 	pip install -e .; \
 
 clean:
-	rm -rf venv; \
-
-test-setup:
-	source ./${VENV}/bin/activate; \
-	pip install -r test-requirements.txt; \
+	rm -rf ${VENV}; \
 
 typecheck: test-setup
 	mypy src;
 	$(MAKE) test-cleaning
 
-lint: test-setup
-	flake8 src;
-	$(MAKE) test-cleaning
+lint:
+	hatch run style:check
 
-test-cleaning:
-	pip uninstall -r test-requirements.txt -y;
-
-start:
-	source ./${VENV}/bin/activate; \
-	cd web; \
-	flask run --host=0.0.0.0 --port=8531
-
-start-dev:
-	source ./${VENV}/bin/activate; \
-	cd web; \
-	flask run --host=0.0.0.0 --port=8531 --debug
+format:
+	hatch run style:format

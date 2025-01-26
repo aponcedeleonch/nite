@@ -1,18 +1,17 @@
 import time
-from typing import Optional, Union, Tuple, List
-from enum import Enum
 from datetime import timedelta
+from enum import Enum
 from multiprocessing import Queue
 from queue import Empty as QueueEmpty
-from dataclasses import dataclass
+from typing import List, Optional, Tuple, Union
 
-from pydantic import BaseModel, computed_field, field_validator, ValidationInfo
 import numpy as np
+from pydantic import BaseModel, ValidationInfo, computed_field, field_validator
 
-from nite.config import TERMINATE_MESSAGE, KEEPALIVE_TIMEOUT
+from nite.config import KEEPALIVE_TIMEOUT, TERMINATE_MESSAGE
 from nite.logging import configure_module_logging
 
-LOGGING_NAME = 'nite.video_mixer'
+LOGGING_NAME = "nite.video_mixer"
 logger = configure_module_logging(LOGGING_NAME)
 
 
@@ -20,12 +19,13 @@ class TimeRecorder(BaseModel):
     start_time: Optional[float] = None
     time_from_last_timeout: Optional[float] = None
     period_timeout_sec: float = KEEPALIVE_TIMEOUT
+    time_from_last_asked: Optional[float] = None
 
-    @field_validator('period_timeout_sec')
+    @field_validator("period_timeout_sec")
     @classmethod
     def period_timeout_sec_not_zero(cls, period_timeout_sec):
         if period_timeout_sec <= 0:
-            raise ValueError('period_timeout_sec must be greater than 0')
+            raise ValueError("period_timeout_sec must be greater than 0")
         return period_timeout_sec
 
     def start_recording_if_not_started(self):
@@ -37,7 +37,7 @@ class TimeRecorder(BaseModel):
     @property
     def elapsed_time(self) -> float:
         if self.start_time is None:
-            raise ValueError('TimeRecorder has not started recording time')
+            raise ValueError("TimeRecorder has not started recording time")
         return time.time() - self.start_time
 
     @computed_field  # type: ignore[misc]
@@ -50,7 +50,7 @@ class TimeRecorder(BaseModel):
     @computed_field  # type: ignore[misc]
     @property
     def elapsed_time_str(self) -> str:
-        return f'{timedelta(seconds=self.elapsed_time)}'
+        return f"{timedelta(seconds=self.elapsed_time)}"
 
     @computed_field  # type: ignore[misc]
     @property
@@ -62,51 +62,63 @@ class TimeRecorder(BaseModel):
             return True
         return False
 
+    @computed_field  # type: ignore[misc]
+    @property
+    def elapsed_time_in_ms_since_last_asked(self) -> float:
+        new_time_asked = time.time()
+        if self.time_from_last_asked is None:
+            self.time_from_last_asked = self.start_time
+        elapsed_time = new_time_asked - self.time_from_last_asked
+        self.time_from_last_asked = new_time_asked
+        return elapsed_time * 1000
+
 
 class MessageConentType(str, Enum):
-    message = 'message'
-    audio_sample = 'audio_sample'
+    message = "message"
+    audio_sample = "audio_sample"
+    blend_strength = "blend_strength"
 
 
 class Message(BaseModel):
     content_type: MessageConentType
-    content: Union[str, List[float]]
+    content: Union[str, List[float], float]
 
-    @field_validator('content')
+    @field_validator("content")
     @classmethod
     def content_respects_type(cls, content, info: ValidationInfo):
-        if 'content_type' not in info.data:
-            raise ValueError('Message content_type must be defined')
+        if "content_type" not in info.data:
+            raise ValueError("Message content_type must be defined")
 
-        if info.data['content_type'] == MessageConentType.message and not isinstance(content, str):
-            raise ValueError('Message content must be a string as content_type is message')
+        if info.data["content_type"] == MessageConentType.message and not isinstance(content, str):
+            raise ValueError("Message content must be a string as content_type is message")
 
-        if info.data['content_type'] == MessageConentType.audio_sample:
+        if info.data["content_type"] == MessageConentType.audio_sample:
             try:
                 content_npy = np.array(content)
             except Exception:
-                raise ValueError('content_type = audio_sample: Message content must be transformable to a numpy array')
+                raise ValueError(
+                    "content_type = audio_sample: Content must be transformable to a numpy array"
+                )
 
             if not np.issubdtype(content_npy.dtype, np.number):
-                raise ValueError('content_type = audio_sample. Message content must be a float array')
+                raise ValueError("content_type = audio_sample. Content must be a float array")
+
+        if info.data["content_type"] == MessageConentType.blend_strength and not isinstance(
+            content, float
+        ):
+            raise ValueError("Message content must be a float as content_type is blend_strength")
 
         return content
 
 
-@dataclass
-class CommQueues:
-    in_queue: Queue
-    out_queue: Queue
-
-
-class ProcessWithQueue:
-
-    def __init__(self, queues: CommQueues) -> None:
-        self.queues = queues
+class QueueHandler:
+    def __init__(self, in_queue: Queue, out_queue: Queue) -> None:
+        self.in_queue = in_queue
+        self.out_queue = out_queue
 
     def _receive_from_queue(self) -> Optional[Message]:
         try:
-            message = self.queues.in_queue.get(block=False)
+            message = self.in_queue.get(block=False)
             return message
         except QueueEmpty:
             pass
@@ -114,13 +126,19 @@ class ProcessWithQueue:
 
     def send_message(self, message: str) -> None:
         message_obj = Message(content_type=MessageConentType.message, content=message)
-        self.queues.out_queue.put(message_obj)
+        self.out_queue.put(message_obj)
 
     def send_audio_sample(self, audio_sample: np.ndarray) -> None:
-        message_obj = Message(content_type=MessageConentType.audio_sample, content=audio_sample.tolist())
-        self.queues.out_queue.put(message_obj)
+        message_obj = Message(
+            content_type=MessageConentType.audio_sample, content=audio_sample.tolist()
+        )
+        self.out_queue.put(message_obj)
 
-    def receive(self) -> Tuple[bool, Optional[np.ndarray]]:
+    def send_blend_strength(self, blend_strength: float) -> None:
+        message_obj = Message(content_type=MessageConentType.blend_strength, content=blend_strength)
+        self.out_queue.put(message_obj)
+
+    def receive_audio_sample(self) -> Tuple[bool, Optional[np.ndarray]]:
         message_obj = self._receive_from_queue()
         if not message_obj:
             return False, None
@@ -130,9 +148,29 @@ class ProcessWithQueue:
 
         if message_obj.content_type == MessageConentType.message:
             return self.should_terminate(str(message_obj.content)), None
+
+        return False, None
+
+    def receive_blend_strength(self) -> Tuple[bool, Optional[float]]:
+        message_obj = self._receive_from_queue()
+        if not message_obj:
+            return False, 0.0
+
+        if message_obj.content_type == MessageConentType.blend_strength:
+            return False, message_obj.content
+
+        if message_obj.content_type == MessageConentType.message:
+            return self.should_terminate(str(message_obj.content)), None
+
         return False, None
 
     def should_terminate(self, message: str) -> bool:
         if message == TERMINATE_MESSAGE:
             return True
         return False
+
+    def cleanup(self) -> None:
+        self.in_queue.close()
+        self.out_queue.close()
+        self.in_queue.cancel_join_thread()
+        self.out_queue.cancel_join_thread()

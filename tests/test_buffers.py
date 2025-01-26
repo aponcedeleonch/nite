@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from nite.config import AUDIO_SAMPLING_RATE
-from nite.video_mixer.buffers import TimedSampleBuffer, SampleBuffer
+from nite.video_mixer.buffers import SampleBuffer, TimedSampleBuffer
 
 
 class MockTimeRecorder:
@@ -54,7 +54,7 @@ def test_add_sample_to_buffer():
     timed_sample_buffer.add_sample_to_buffer(sample)
 
     assert timed_sample_buffer.num_samples_per_second[-1] == len(sample)
-    assert np.array_equal(timed_sample_buffer.buffer[:len(sample), -1], sample)
+    assert np.array_equal(timed_sample_buffer.buffer[: len(sample), -1], sample)
     assert np.array_equal(timed_sample_buffer(), sample)
 
 
@@ -65,34 +65,39 @@ def test_add_two_samples_same_second():
     sample_1 = np.ones(10)
     timed_sample_buffer.add_sample_to_buffer(sample_1)
     assert timed_sample_buffer.num_samples_per_second[-1] == len(sample_1)
-    assert np.array_equal(timed_sample_buffer.buffer[:len(sample_1), -1], sample_1)
+    assert np.array_equal(timed_sample_buffer.buffer[: len(sample_1), -1], sample_1)
     assert np.array_equal(timed_sample_buffer(), sample_1)
 
     sample_2 = np.ones(20)
     timed_sample_buffer.add_sample_to_buffer(sample_2)
 
     assert timed_sample_buffer.num_samples_per_second[-1] == len(sample_1) + len(sample_2)
-    assert np.array_equal(timed_sample_buffer.buffer[:len(sample_1), -1], sample_1)
-    assert np.array_equal(timed_sample_buffer.buffer[len(sample_1):len(sample_1) + len(sample_2), -1], sample_2)
+    assert np.array_equal(timed_sample_buffer.buffer[: len(sample_1), -1], sample_1)
+    assert np.array_equal(
+        timed_sample_buffer.buffer[len(sample_1) : len(sample_1) + len(sample_2), -1],
+        sample_2,
+    )
     assert np.array_equal(timed_sample_buffer(), np.concatenate([sample_1, sample_2]))
 
 
 def test_overflow_buffer():
-    timed_sample_buffer = TimedSampleBuffer(max_seconds_in_buffer=1, min_seconds_in_buffer=0, buffer_cap_per_sec=10)
+    timed_sample_buffer = TimedSampleBuffer(
+        max_seconds_in_buffer=1, min_seconds_in_buffer=0, buffer_cap_per_sec=10
+    )
     timed_sample_buffer.timer_buffer = MockTimeRecorder(period_timeout_sec=1)
 
     sample = np.ones(10)
     timed_sample_buffer.add_sample_to_buffer(sample)
 
     assert timed_sample_buffer.num_samples_per_second[-1] == len(sample)
-    assert np.array_equal(timed_sample_buffer.buffer[:len(sample), -1], sample)
+    assert np.array_equal(timed_sample_buffer.buffer[: len(sample), -1], sample)
     assert np.array_equal(timed_sample_buffer(), sample)
 
     sample_overflow = np.ones(10) + 1
     timed_sample_buffer.add_sample_to_buffer(sample_overflow)
 
     assert timed_sample_buffer.num_samples_per_second[-1] == len(sample)
-    assert np.array_equal(timed_sample_buffer.buffer[:len(sample), -1], sample)
+    assert np.array_equal(timed_sample_buffer.buffer[: len(sample), -1], sample)
     assert np.array_equal(timed_sample_buffer(), sample)
 
 
@@ -109,7 +114,7 @@ def test_add_sample_to_buffer_with_period_passed_and_empty_first_second():
     assert np.allclose(timed_sample_buffer.buffer[:, 0], 0)
 
     assert timed_sample_buffer.num_samples_per_second[-1] == len(sample)
-    assert np.array_equal(timed_sample_buffer.buffer[:len(sample), -1], sample)
+    assert np.array_equal(timed_sample_buffer.buffer[: len(sample), -1], sample)
     assert np.array_equal(timed_sample_buffer(), sample)
 
 
@@ -120,7 +125,7 @@ def test_add_sample_to_buffer_with_period_passed():
     sample_1 = np.ones(10)
     timed_sample_buffer.add_sample_to_buffer(sample_1)
     assert timed_sample_buffer.num_samples_per_second[-1] == len(sample_1)
-    assert np.array_equal(timed_sample_buffer.buffer[:len(sample_1), -1], sample_1)
+    assert np.array_equal(timed_sample_buffer.buffer[: len(sample_1), -1], sample_1)
     assert np.array_equal(timed_sample_buffer(), sample_1)
 
     timed_sample_buffer.timer_buffer.simulate_period_passed()
@@ -131,14 +136,16 @@ def test_add_sample_to_buffer_with_period_passed():
     assert len(timed_sample_buffer.num_samples_per_second) == 2
 
     assert timed_sample_buffer.num_samples_per_second[-1] == len(sample_2)
-    assert np.array_equal(timed_sample_buffer.buffer[:len(sample_2), -1], sample_2)
+    assert np.array_equal(timed_sample_buffer.buffer[: len(sample_2), -1], sample_2)
 
     assert np.array_equal(timed_sample_buffer(), np.concatenate([sample_1, sample_2]))
 
 
-@pytest.mark.parametrize('min_seconds_in_buffer', [0, 1, 10])
+@pytest.mark.parametrize("min_seconds_in_buffer", [0, 1, 10])
 def test_has_enough_data(min_seconds_in_buffer):
-    timed_sample_buffer = TimedSampleBuffer(max_seconds_in_buffer=10, min_seconds_in_buffer=min_seconds_in_buffer)
+    timed_sample_buffer = TimedSampleBuffer(
+        max_seconds_in_buffer=10, min_seconds_in_buffer=min_seconds_in_buffer
+    )
     timed_sample_buffer.timer_buffer = MockTimeRecorder(period_timeout_sec=1)
 
     assert not timed_sample_buffer.has_enough_data()
@@ -157,9 +164,11 @@ def test_has_enough_data(min_seconds_in_buffer):
     assert timed_sample_buffer.has_enough_data()
 
 
-@pytest.mark.parametrize('max_seconds_in_buffer', [1, 10])
+@pytest.mark.parametrize("max_seconds_in_buffer", [1, 10])
 def test_rotate_buffer(max_seconds_in_buffer):
-    timed_sample_buffer = TimedSampleBuffer(max_seconds_in_buffer=max_seconds_in_buffer, min_seconds_in_buffer=0)
+    timed_sample_buffer = TimedSampleBuffer(
+        max_seconds_in_buffer=max_seconds_in_buffer, min_seconds_in_buffer=0
+    )
     timed_sample_buffer.timer_buffer = MockTimeRecorder(period_timeout_sec=1)
 
     sample_len = AUDIO_SAMPLING_RATE // 2
@@ -167,7 +176,7 @@ def test_rotate_buffer(max_seconds_in_buffer):
     timed_sample_buffer.add_sample_to_buffer(sample)
 
     assert timed_sample_buffer.num_samples_per_second[-1] == len(sample)
-    assert np.array_equal(timed_sample_buffer.buffer[:len(sample), -1], sample)
+    assert np.array_equal(timed_sample_buffer.buffer[: len(sample), -1], sample)
     assert np.array_equal(timed_sample_buffer(), sample)
 
     for i_sec in range(max_seconds_in_buffer + 1):
@@ -176,9 +185,15 @@ def test_rotate_buffer(max_seconds_in_buffer):
         timed_sample_buffer.add_sample_to_buffer(sample)
 
     assert len(timed_sample_buffer.num_samples_per_second) == max_seconds_in_buffer + 1
-    assert timed_sample_buffer.buffer.shape == (AUDIO_SAMPLING_RATE, max_seconds_in_buffer + 1)
+    assert timed_sample_buffer.buffer.shape == (
+        AUDIO_SAMPLING_RATE,
+        max_seconds_in_buffer + 1,
+    )
     assert np.array_equal(timed_sample_buffer.buffer[:sample_len, 0], np.ones(sample_len) + 1)
-    assert np.array_equal(timed_sample_buffer.buffer[:sample_len, -1], np.ones(sample_len) + max_seconds_in_buffer + 1)
+    assert np.array_equal(
+        timed_sample_buffer.buffer[:sample_len, -1],
+        np.ones(sample_len) + max_seconds_in_buffer + 1,
+    )
 
 
 @pytest.fixture
@@ -193,12 +208,15 @@ def test_initial_state_sample_buffer(sample_buffer):
 
 
 def test_invalid_min_buffer_size():
-    with pytest.raises(ValueError, match='min_buffer_size must be greater than 0'):
+    with pytest.raises(ValueError, match="min_buffer_size must be greater than 0"):
         SampleBuffer(max_buffer_size=10, min_buffer_size=0)
 
 
 def test_invalid_max_buffer_size():
-    with pytest.raises(ValueError, match='max_buffer_size must be equal or greater than min_buffer_size'):
+    with pytest.raises(
+        ValueError,
+        match="max_buffer_size must be equal or greater than min_buffer_size",
+    ):
         SampleBuffer(max_buffer_size=4, min_buffer_size=5)
 
 
