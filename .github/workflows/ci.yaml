@@ -1,0 +1,42 @@
+# This workflow tests and lints the project
+name: Test & Lint
+
+on:
+  pull_request:
+    branches:
+      - '**'  # Run on all branches for PRs
+  push:
+    branches:
+      - main  # Run on the main branch
+
+jobs:
+  test:
+    name: Run
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.12"]
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install Project
+      run: make install
+
+    - name: Load venv
+      run: source ./venv/bin/activate
+
+    - name: Run linting
+      run: make lint
+
+    - name: Run Typecheck
+      run: make typecheck
+
+    - name: Run tests
+      run: make test

@@ -1,7 +1,8 @@
 .PHONY: install, clean, typecheck, lint, format
 
 # Expected to be a path set by the user
-VENV?=~/py_venvs/nite_env
+# VENV?=~/py_venvs/nite_env
+VENV?=./venv
 
 install:
 	python3.12 -m venv ${VENV};
