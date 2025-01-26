@@ -15,7 +15,7 @@ class Blender(ABC):
         pass
 
     @abstractmethod
-    def blend(self, frames: List[cv2.typing.MatLike]) -> cv2.typing.MatLike:
+    def blend(self, frames: List[cv2.typing.MatLike], blend_strength: float) -> cv2.typing.MatLike:
         pass
 
 
@@ -33,7 +33,7 @@ class BlendModes(str, Enum):
 
 
 def get_video_2_weighted(
-    video_2: np.ndarray, alpha: np.ndarray, blend_strength: float
+    video_2: np.ndarray, alpha: Optional[np.ndarray], blend_strength: float
 ) -> np.ndarray:
     video_2_weighted = (
         video_2 if alpha is None else (255.0 * video_2 * (alpha / 255.0)).astype(np.uint8)
@@ -138,8 +138,9 @@ class BlenderMath(Blender):
         self.blend_function = blend_functions[blend_mode]
         logger.info(f"Loaded math blender with operation: {blend_mode}")
 
-    def blend(self, frames: List[cv2.typing.MatLike], blend_strength) -> cv2.typing.MatLike:
-        return self.blend_function(*frames, blend_strength=blend_strength)
+    def blend(self, frames: List[cv2.typing.MatLike], blend_strength: float) -> cv2.typing.MatLike:
+        video_1, video_2, alpha = frames
+        return self.blend_function(video_1, video_2, alpha, blend_strength=blend_strength)
 
 
 class BlendWithSong:

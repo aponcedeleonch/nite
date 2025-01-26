@@ -2,6 +2,11 @@ import librosa
 import numpy as np
 import pytest
 
+from nite.audio.audio_processing import (
+    BPMDetector,
+    ChromaIndex,
+    PitchDetector,
+)
 from nite.config import (
     AUDIO_SAMPLING_RATE,
     BPM_BUFFER_BPMS_MAX,
@@ -9,11 +14,6 @@ from nite.config import (
     BPM_BUFFER_SECONDS_MAX,
     BPM_BUFFER_SECONDS_MIN,
     BPM_BUFFER_SECS_REMOVE,
-)
-from nite.video_mixer.audio.audio_processing import (
-    BPMDetector,
-    ChromaIndex,
-    PitchDetector,
 )
 from nite.video_mixer.buffers import SampleBuffer
 
@@ -153,7 +153,9 @@ async def test_unmocked_detect_bpm(librosa_file: BPMDetector, expected_bpm: int)
 @pytest.fixture
 def pitch_detector():
     buffer_audio = MockBuffer(has_enough_data=True)
-    return PitchDetector(buffer_audio=buffer_audio, sampling_rate=AUDIO_SAMPLING_RATE)
+    return PitchDetector(
+        buffer_audio=buffer_audio, sampling_rate=AUDIO_SAMPLING_RATE, should_return_latest=True
+    )
 
 
 def test_initial_state_pitch(pitch_detector: PitchDetector):
@@ -168,7 +170,7 @@ def test_get_latest_chromogram(pitch_detector: PitchDetector):
     latest_chromogram = pitch_detector._get_chromogram()
     assert latest_chromogram is not None
     assert isinstance(latest_chromogram, np.ndarray)
-    assert latest_chromogram.shape == (12,)
+    assert latest_chromogram.shape == (12, 1)
 
 
 @pytest.mark.asyncio

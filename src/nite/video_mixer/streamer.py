@@ -110,6 +110,7 @@ class VideoCombinerQueue(VideoCombiner):
                 should_blend = True
             else:
                 should_blend = False
+                blend_strength = 0
             frame = self.blender.blend(
                 frames, should_blend=should_blend, blend_strength=blend_strength
             )

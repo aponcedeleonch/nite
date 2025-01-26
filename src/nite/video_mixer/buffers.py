@@ -117,7 +117,7 @@ class SampleBuffer(Buffer):
     ) -> None:
         super().__init__()
         if min_buffer_size < 0:
-            raise ValueError("min_buffer_size must be equal or  greater than 0")
+            raise ValueError("min_buffer_size must be equal or greater than 0")
 
         if max_buffer_size is not None and max_buffer_size < min_buffer_size:
             raise ValueError("max_buffer_size must be equal or greater than min_buffer_size")

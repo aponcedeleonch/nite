@@ -208,8 +208,8 @@ def test_initial_state_sample_buffer(sample_buffer):
 
 
 def test_invalid_min_buffer_size():
-    with pytest.raises(ValueError, match="min_buffer_size must be greater than 0"):
-        SampleBuffer(max_buffer_size=10, min_buffer_size=0)
+    with pytest.raises(ValueError, match="min_buffer_size must be equal or greater than 0"):
+        SampleBuffer(max_buffer_size=10, min_buffer_size=-1)
 
 
 def test_invalid_max_buffer_size():

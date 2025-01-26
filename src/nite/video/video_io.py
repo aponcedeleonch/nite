@@ -167,7 +167,7 @@ class VideoStream(BaseModel):
 
 
 class NiteVideo:
-    def __init__(self, video_path: str, video_stream: VideoStream, is_alpha: bool = False) -> None:
+    def __init__(self, video_path: Path, video_stream: VideoStream, is_alpha: bool = False) -> None:
         self.video_path = video_path
         self.video_stream = video_stream
         self.video_frames_path = None

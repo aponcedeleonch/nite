@@ -12,12 +12,16 @@ install:
 clean:
 	rm -rf ${VENV}; \
 
-typecheck: test-setup
-	mypy src;
-	$(MAKE) test-cleaning
+typecheck:
+	hatch run test:typing;
+
+test:
+	hatch run test:unit;
 
 lint:
 	hatch run style:check
 
 format:
 	hatch run style:format
+
+all: format lint typecheck test
