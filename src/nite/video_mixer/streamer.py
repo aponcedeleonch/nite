@@ -11,8 +11,8 @@ from nite.audio.audio_action import AudioActions
 from nite.audio.audio_io import AudioListener
 from nite.logging import configure_module_logging
 from nite.video.video import VideoFramesPath
-from nite.video_mixer import TimeRecorder
 from nite.video_mixer.blender import BlendWithSong
+from nite.video_mixer.time_recorder import TimeRecorder
 
 logger = configure_module_logging("nite.streamer")
 
@@ -103,10 +103,17 @@ class VideoCombinerQueue(VideoCombiner):
         self._actions_queue = actions_queue
 
     def stream(self) -> None:
+        """
+        Get the frames from the videos and blend them. The blend strength will be received from the
+        actions queue.
+        """
+
+        # Combine the frames from the videos to iterate infinitely over them
         generators = [video.circular_frame_generator() for video in self.videos]
         logger.info("Starting stream")
         self.time_recorder.start_recording_if_not_started()
         try:
+            # Iterate over the frames and blend them
             for frames in zip(*generators):
                 try:
                     blend_strength = self._actions_queue.get_nowait()
@@ -119,14 +126,18 @@ class VideoCombinerQueue(VideoCombiner):
                 else:
                     should_blend = False
                     blend_strength = 0
+
+                # Get the blended frame
                 frame = self.blender.blend(
                     frames,  # type: ignore[arg-type]
                     should_blend=should_blend,
                     blend_strength=blend_strength,
                 )
+
                 if self.time_recorder.has_period_passed:
                     logger.info(f"Keep-alive. Elapsed time: {self.time_recorder.elapsed_time_str}")
 
+                # Show the blended frame using OpenCV
                 cv2.imshow("frame combined", frame)
                 cv2.waitKey(self.ms_to_wait)
         except KeyboardInterrupt:
@@ -152,6 +163,12 @@ class VideoCombinerAudioListenerQueue(VideoCombiner):
         self._actions_queue = actions_queue
 
     def stream(self) -> None:
+        """
+        Run the stream for the given playback time. The audio listener will start the audio
+        processing and the video combiner will combine the video frames with the audio actions.
+
+        Both the audio listener and the video combiner will run in separate processes.
+        """
         logger.info(f"Starting stream for {self._playback_time_sec} seconds")
 
         video_combiner_sub = Process(target=self._video_combiner_queue.stream, daemon=True)

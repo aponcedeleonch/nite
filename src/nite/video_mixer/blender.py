@@ -153,6 +153,9 @@ class BlendWithSong:
         should_blend: bool,
         blend_strength: float,
     ) -> cv2.typing.MatLike:
+        """
+        The output frame will be a single frame result of blending the frames with the blender.
+        """
         if should_blend:
             return self.blender.blend(frames, blend_strength)
         else:

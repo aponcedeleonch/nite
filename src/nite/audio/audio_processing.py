@@ -31,6 +31,10 @@ class ChromaIndex(int, Enum):
 
 
 class AudioSampleFeatures(BaseModel):
+    """
+    Available features to detect from the audio samples.
+    """
+
     bpm: Optional[float] = None
     pitches: Optional[List[ChromaIndex]] = None
 
@@ -50,6 +54,13 @@ class BPMDetector(Detector):
         sampling_rate: float = AUDIO_SAMPLING_RATE,
         reset_after_prediction: bool = False,
     ) -> None:
+        """
+        BPM detector class to detect the BPM of the audio samples.
+
+        Initializing the buffer_audio empty will create an empty limitless buffer.
+        The reset_after_prediction parameter will reset the buffer after a prediction is made.
+        Can be used to not make predictions too often.
+        """
         self.tolerance_threshold = tolerance_threshold
         self.buffer_audio = buffer_audio
         self.buffer_recorded_bpms = buffer_recorded_bpms
@@ -57,16 +68,25 @@ class BPMDetector(Detector):
         self.reset_after_prediction = reset_after_prediction
 
     def _has_bpm_changed_significantly(self, last_recorded_bpm: np.ndarray) -> bool:
+        """
+        Heuristic to check if the BPM has changed significantly.
+        """
+        # If we don't have enough data, we can't make a prediction
         if not self.buffer_recorded_bpms.has_enough_data():
             return False
-
         if len(self.buffer_recorded_bpms.buffered_data) == 0:
             return False
 
+        # Calculate the absolute distance to the buffered BPMs
         distance_to_buffered_bpms = np.abs(
             last_recorded_bpm - self.buffer_recorded_bpms.buffered_data
         )
+
+        # Calculate the average distance to the buffered BPMs
         avg_distance_to_buffered_bpms = np.mean(distance_to_buffered_bpms)
+
+        # Check if the average distance is greater than the tolerance threshold.
+        # If it is, the BPM has changed significantly.
         has_bpm_changed = avg_distance_to_buffered_bpms > self.tolerance_threshold
         return has_bpm_changed
 
@@ -76,6 +96,10 @@ class BPMDetector(Detector):
         return np.mean(self.buffer_recorded_bpms.buffered_data)
 
     def _get_estimated_bpm(self) -> Optional[np.ndarray]:
+        """
+        Here is where we estimate the BPM of the audio samples using the librosa library.
+        """
+        # If we don't have enough data, we can't make a prediction
         if not self.buffer_audio.has_enough_data():
             return None
 
@@ -84,6 +108,7 @@ class BPMDetector(Detector):
         last_recorded_bpm, _ = librosa.beat.beat_track(
             y=self.buffer_audio.buffered_data, sr=self.sampling_rate, start_bpm=120
         )
+        # Standardize the BPM prediction to be a numpy array
         if isinstance(last_recorded_bpm, np.ndarray):
             if len(last_recorded_bpm) != 1:
                 raise ValueError(
@@ -99,10 +124,14 @@ class BPMDetector(Detector):
         return last_recorded_bpm
 
     async def detect(self, audio_sample: np.ndarray) -> Optional[float]:
+        """
+        Detect the BPM of the audio samples using the librosa library.
+        """
+        # Add the audio sample to the buffer
         self.buffer_audio.add_sample_to_buffer(audio_sample)
 
+        # Get the estimated BPM
         last_recorded_bpm = self._get_estimated_bpm()
-        # logger.info(f"Predicted BPM: {last_recorded_bpm}")
         if last_recorded_bpm is None:
             return None
 
@@ -110,6 +139,9 @@ class BPMDetector(Detector):
         if self.reset_after_prediction:
             self.buffer_audio.remove_samples_from_buffer()
 
+        # Heuristic to reset the buffer if the BPM has changed significantly
+        # In theory, the buffer should not change significantly with the same song.
+        # If it does, it means that the song has changed.
         if self._has_bpm_changed_significantly(last_recorded_bpm):
             self.buffer_audio.reset_buffer()
             self.buffer_recorded_bpms.reset_buffer()
@@ -129,6 +161,13 @@ class PitchDetector(Detector):
         should_return_latest: bool = False,
         hop_length: int = 512,
     ) -> None:
+        """
+        Pitch detector class to detect the pitch of the audio samples.
+
+        Initializing the buffer_audio empty will create an empty limitless buffer.
+        The reset_after_prediction parameter will reset the buffer after a prediction is made.
+        Can be used to not make predictions too often.
+        """
         self.buffer_audio = buffer_audio
         self.sampling_rate = sampling_rate
         self.reset_after_prediction = reset_after_prediction
@@ -136,6 +175,12 @@ class PitchDetector(Detector):
         self.hop_length = hop_length
 
     def _get_chromogram(self) -> np.ndarray:
+        """
+        Make the chromogram estimation using the STFT method.
+
+        Here we're estimating the chroma (pitch) of the audio samples.
+        [Docs](https://librosa.org/doc/0.10.2/generated/librosa.feature.chroma_stft.html)
+        """
         estimated_chromogram = librosa.feature.chroma_stft(
             y=self.buffer_audio.buffered_data, sr=self.sampling_rate, hop_length=self.hop_length
         )
@@ -144,20 +189,31 @@ class PitchDetector(Detector):
         return estimated_chromogram
 
     async def detect(self, audio_sample_normalized: np.ndarray) -> Optional[List[ChromaIndex]]:
+        """
+        Detect the pitch of the audio samples using the chroma estimation.
+        """
+        # Add the audio sample to the buffer
         self.buffer_audio.add_sample_to_buffer(audio_sample_normalized)
 
+        # If we don't have enough data, we can't make a prediction
         if not self.buffer_audio.has_enough_data():
             return None
 
+        # Get the chromogram estimation
+        chromogram = self._get_chromogram()
+
+        # Remove some samples from the buffer to not make predictions so often and slow the process
         if self.reset_after_prediction:
             self.buffer_audio.remove_samples_from_buffer()
 
-        chromogram = self._get_chromogram()
+        # Only pick the highest probability pitch. The chromogram is a 12xN matrix. Where
+        # N is the number of frames and 12 is the number of pitches.
         highest_prob_pitchs = np.argmax(chromogram, axis=0)
         if self.should_return_latest:
             detected_chromas = [ChromaIndex(pitch) for pitch in highest_prob_pitchs]
             return detected_chromas
 
+        # Get the detected chromas frames in seconds
         chromas_timing = librosa.core.frames_to_time(
             np.arange(len(highest_prob_pitchs)),
             sr=self.sampling_rate,
@@ -178,6 +234,10 @@ class AudioProcessor:
         bpm_detector: Optional[BPMDetector] = None,
         pitch_detector: Optional[PitchDetector] = None,
     ) -> None:
+        """
+        The audio processor class is meant to process audio samples and detect features
+        like BPM and pitch. It uses the provided detectors to detect the features.
+        """
         if bpm_detector is None and pitch_detector is None:
             raise ValueError("At least one detector must be provided.")
 
@@ -186,17 +246,25 @@ class AudioProcessor:
         self.pitch_detector = pitch_detector
 
     def set_sampling_rate(self, sampling_rate: float) -> None:
+        """
+        Both detectors need to have the same sampling rate of the audio samples to
+        perform the analysis. This method sets the sampling rate for both detectors.
+        """
         if self.bpm_detector is not None:
             self.bpm_detector.sampling_rate = sampling_rate
         if self.pitch_detector is not None:
             self.pitch_detector.sampling_rate = sampling_rate
 
     async def process_audio_sample(self, audio_sample: np.ndarray) -> AudioSampleFeatures:
+        """
+        Process the audio sample and detect the features like BPM and pitch.
+        """
         if self.audio_format is not None:
             audio_sample_normalized = audio_sample * self.audio_format.normalization_factor
         else:
             audio_sample_normalized = audio_sample
 
+        # Detect BPM and pitch asynchronously
         task_bpm, task_pitch = None, None
         async with asyncio.TaskGroup() as tg:
             if self.bpm_detector is not None:

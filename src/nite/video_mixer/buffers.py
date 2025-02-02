@@ -5,7 +5,7 @@ import numpy as np
 
 from nite.config import AUDIO_SAMPLING_RATE
 from nite.logging import configure_module_logging
-from nite.video_mixer import TimeRecorder
+from nite.video_mixer.time_recorder import TimeRecorder
 
 logger = configure_module_logging("nite.buffers")
 
