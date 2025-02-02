@@ -1,6 +1,5 @@
 import asyncio
 from abc import ABC, abstractmethod
-from multiprocessing import Queue
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -22,7 +21,6 @@ from nite.video.video_io import NiteVideo, VideoStream
 from nite.video_mixer.blender import BlenderMath, BlendModes, BlendWithSong
 from nite.video_mixer.buffers import SampleBuffer
 from nite.video_mixer.streamer import (
-    QueueHandler,
     VideoCombinerAudioListenerQueue,
     VideoCombinerQueue,
     VideoCombinerSong,
@@ -98,7 +96,7 @@ class AudioFactory(NiteFactory):
         min_pitch: Optional[int],
         max_pitch: Optional[int],
         blend_falloff: float,
-        queue_handler: Optional[QueueHandler] = None,
+        actions_queue: Optional[asyncio.Queue] = None,
     ) -> None:
         self._validate_settings(bpm_frequency, min_pitch, max_pitch)
         self.bpm_action = None
@@ -113,7 +111,7 @@ class AudioFactory(NiteFactory):
                 min_pitch=ChromaIndex(min_pitch), max_pitch=ChromaIndex(max_pitch)
             )
 
-        self.queue_handler = queue_handler
+        self._actions_queue = actions_queue
 
     def _validate_settings(
         self,
@@ -150,8 +148,8 @@ class AudioFactory(NiteFactory):
         )
 
     async def get_stream_config(self) -> Tuple[AudioListener, AudioActions]:
-        if self.queue_handler is None:
-            raise InitMixerError("QueueHandler must be set when initializing audio strem.")
+        if self._actions_queue is None:
+            raise InitMixerError("Actions Queue must be set when initializing audio strem.")
         bpm_detector, pitch_detector = None, None
         if self.bpm_action is not None:
             bpm_detector_factory = BPMDetectorFactory(nite_config.AUDIO_SAMPLING_RATE)
@@ -164,7 +162,7 @@ class AudioFactory(NiteFactory):
             bpm_detector, pitch_detector, audio_format=short_format
         )
         return AudioListener(
-            queue_handler=self.queue_handler,
+            actions_queue=self._actions_queue,
             audio_processor=audio_processor,
             audio_actions=audio_actions,
         ), audio_actions
@@ -193,7 +191,7 @@ class VideoFactory(NiteFactory):
         video_2: Path,
         alpha: Path,
         blend_operation: str,
-        queue_handler: Optional[QueueHandler] = None,
+        actions_queue: Optional[asyncio.Queue] = None,
         audio_actions: Optional[AudioActions] = None,
     ) -> None:
         self.width = width
@@ -202,7 +200,7 @@ class VideoFactory(NiteFactory):
         self.video_2 = video_2
         self.alpha = alpha
         self.blend_operation = blend_operation
-        self.queue_handler = queue_handler
+        self._actions_queue = actions_queue
         self.audio_actions = audio_actions
 
     async def _init(self) -> Tuple[List[VideoFramesPath], BlendWithSong]:
@@ -236,10 +234,10 @@ class VideoFactory(NiteFactory):
         return BlendWithSong(blender_math)
 
     async def get_stream_config(self) -> VideoCombinerQueue:
-        if self.queue_handler is None:
-            raise InitMixerError("QueueHandler must be set when initializing video stream.")
+        if self._actions_queue is None:
+            raise InitMixerError("Actions Queue must be set when initializing video stream.")
         videos, blender = await self._init()
-        return VideoCombinerQueue(videos, blender, self.queue_handler)
+        return VideoCombinerQueue(videos, blender, self._actions_queue)
 
     async def get_song_config(self) -> VideoCombinerSong:
         if self.audio_actions is None:
@@ -280,10 +278,8 @@ class VideoCombinerFactory:
     async def get_stream_config(self) -> VideoCombinerAudioListenerQueue:
         if self.playback_time_sec is None:
             raise InitMixerError("Playback time must be set when initializing video stream.")
-        queue_to_video: Queue = Queue()
-        queue_to_audio: Queue = Queue()
-        queue_handler_video = QueueHandler(in_queue=queue_to_video, out_queue=queue_to_audio)
-        queue_handler_audio = QueueHandler(in_queue=queue_to_audio, out_queue=queue_to_video)
+
+        actions_queue = asyncio.Queue()
         video_factory = VideoFactory(
             video_1=self.video_1,
             video_2=self.video_2,
@@ -291,19 +287,19 @@ class VideoCombinerFactory:
             width=self.width,
             height=self.height,
             blend_operation=self.blend_operation,
-            queue_handler=queue_handler_video,
+            actions_queue=actions_queue,
         )
         audio_factory = AudioFactory(
             bpm_frequency=self.bpm_frequency,
             min_pitch=self.min_pitch,
             max_pitch=self.max_pitch,
             blend_falloff=self.blend_falloff,
-            queue_handler=queue_handler_audio,
+            actions_queue=actions_queue,
         )
         video_combiner_queue = await video_factory.get_stream_config()
         audio_listener, _ = await audio_factory.get_stream_config()
         return VideoCombinerAudioListenerQueue(
-            video_combiner_queue, audio_listener, self.playback_time_sec
+            video_combiner_queue, audio_listener, self.playback_time_sec, actions_queue
         )
 
     async def get_song_config(self) -> VideoCombinerSong:

@@ -1,20 +1,20 @@
 import asyncio
-import time
 from abc import ABC, abstractmethod
-from multiprocessing import Process
 from typing import List
 
 import cv2
 
 from nite.audio.audio_action import AudioActions
 from nite.audio.audio_io import AudioListener
-from nite.config import TERMINATE_MESSAGE
 from nite.logging import configure_module_logging
 from nite.video.video import VideoFramesPath
-from nite.video_mixer import Message, QueueHandler, TimeRecorder
+from nite.video_mixer import TimeRecorder
 from nite.video_mixer.blender import BlendWithSong
 
 logger = configure_module_logging("nite.streamer")
+
+class TerminateTaskGroupError(Exception):
+    """Exception raised to terminate a task group."""
 
 
 class VideoCombiner(ABC):
@@ -65,7 +65,7 @@ class VideoCombinerSong(VideoCombiner):
         super().__init__(videos, blender)
         self.actions = actions
 
-    def stream(self) -> None:
+    async def stream(self) -> None:
         generators = [video.circular_frame_generator() for video in self.videos]
         logger.info("Starting stream")
         self.time_recorder.start_recording_if_not_started()
@@ -93,40 +93,43 @@ class VideoCombinerQueue(VideoCombiner):
         self,
         videos: List[VideoFramesPath],
         blender: BlendWithSong,
-        queue_handler: QueueHandler,
+        actions_queue: asyncio.Queue,
     ) -> None:
         super().__init__(videos, blender)
-        self.queue_handler = queue_handler
+        self._actions_queue = actions_queue
 
-    def stream(self) -> None:
+    async def stream(self) -> None:
         generators = [video.circular_frame_generator() for video in self.videos]
         logger.info("Starting stream")
         self.time_recorder.start_recording_if_not_started()
-        for frames in zip(*generators):
-            should_terminate, blend_strength = self.queue_handler.receive_blend_strength()
-            if should_terminate:
-                logger.info("Video stream stopped by terminate message")
-                break
+        try:
+            for frames in zip(*generators):
+                try:
+                    blend_strength = self._actions_queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    # No blend strength received
+                    blend_strength = None
 
-            if blend_strength is not None:
-                should_blend = True
-            else:
-                should_blend = False
-                blend_strength = 0
-            frame = self.blender.blend(
-                frames,  # type: ignore[arg-type]
-                should_blend=should_blend,
-                blend_strength=blend_strength,
-            )
+                if blend_strength is not None:
+                    should_blend = True
+                else:
+                    should_blend = False
+                    blend_strength = 0
+                frame = self.blender.blend(
+                    frames,  # type: ignore[arg-type]
+                    should_blend=should_blend,
+                    blend_strength=blend_strength,
+                )
 
-            if self.time_recorder.has_period_passed:
-                logger.info(f"Keep-alive. Elapsed time: {self.time_recorder.elapsed_time_str}")
+                if self.time_recorder.has_period_passed:
+                    logger.info(f"Keep-alive. Elapsed time: {self.time_recorder.elapsed_time_str}")
 
-            cv2.imshow("frame combined", frame)
-            cv2.waitKey(self.ms_to_wait)
-
-        logger.info(f"Stream stopped. Elapsed time: {self.time_recorder.elapsed_time_str}")
-        cv2.destroyAllWindows()
+                cv2.imshow("frame combined", frame)
+                cv2.waitKey(self.ms_to_wait)
+        except asyncio.CancelledError:
+            logger.info(f"Stream stopped. Elapsed time: {self.time_recorder.elapsed_time_str}")
+        finally:
+            cv2.destroyAllWindows()
 
 
 class VideoCombinerAudioListenerQueue(VideoCombiner):
@@ -135,29 +138,30 @@ class VideoCombinerAudioListenerQueue(VideoCombiner):
         video_combiner_queue: VideoCombinerQueue,
         audio_listener: AudioListener,
         playback_time_sec: int,
+        actions_queue: asyncio.Queue,
     ) -> None:
-        self.video_combiner_queue = video_combiner_queue
-        self.audio_listener = audio_listener
-        self.playback_time_sec = playback_time_sec
+        self._video_combiner_queue = video_combiner_queue
+        self._audio_listener = audio_listener
+        self._playback_time_sec = playback_time_sec
+        self._actions_queue = actions_queue
 
-    def stream(self) -> None:
+    async def force_terminate_task_group():
+        """Used to force termination of a task group."""
+        raise TerminateTaskGroupError()
+
+    async def stream(self) -> None:
         try:
-            audio_process = Process(target=self.audio_listener.start)
-            audio_process.start()
-            stream_process = Process(target=self.video_combiner_queue.stream)
-            stream_process.start()
+            async with asyncio.TaskGroup() as group:
+                # spawn the audio listener with the video combiner
+                group.create_task(self._video_combiner_queue.stream())
+                group.create_task(self._audio_listener.start())
 
-            time.sleep(self.playback_time_sec)
+                await asyncio.sleep(self._playback_time_sec)
+                # add an exception-raising task to force the group to terminate
+                group.create_task(self.force_terminate_task_group())
         except KeyboardInterrupt:
             logger.info("Stream stopped forcefully")
-
-        terminate_message = Message(content=TERMINATE_MESSAGE, content_type="message")
-        logger.info("Sending terminate message to video combiner")
-        self.video_combiner_queue.queue_handler.in_queue.put(terminate_message)
-        time.sleep(1)
-        logger.info("Sending terminate message to audio listener")
-        self.audio_listener.queue_handler.in_queue.put(terminate_message)
-        time.sleep(1)
-        self.video_combiner_queue.queue_handler.cleanup()
-        stream_process.join(timeout=2)
-        audio_process.join(timeout=2)
+        except TerminateTaskGroupError:
+            logger.info("Stream stopped")
+        finally:
+            self._actions_queue.shutdown()
