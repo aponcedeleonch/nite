@@ -131,13 +131,11 @@ class AudioActions(AudioAction):
     def set_features(self, audio_sample_features: AudioSampleFeatures) -> None:
         for action in self.actions:
             if isinstance(action, AudioActionBPM):
-                if audio_sample_features.bpm is None:
-                    raise InvalidAudioFeatureError("Cannnot set BPM to None")
-                action.set_bpm(audio_sample_features.bpm)
+                if audio_sample_features.bpm is not None:
+                    action.set_bpm(audio_sample_features.bpm)
             elif isinstance(action, AudioActionPitch):
-                if audio_sample_features.pitches is None:
-                    raise InvalidAudioFeatureError("Cannnot set pitches to None")
-                action.set_pitches(audio_sample_features.pitches)
+                if audio_sample_features.pitches is not None:
+                    action.set_pitches(audio_sample_features.pitches)
 
     async def act(self, time_in_ms: int) -> Tuple[bool, float]:
         tasks = []
