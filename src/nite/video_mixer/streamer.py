@@ -1,5 +1,8 @@
 import asyncio
+import time
 from abc import ABC, abstractmethod
+from multiprocessing import Process, Queue
+from queue import Empty as QueueEmpty
 from typing import List
 
 import cv2
@@ -12,6 +15,7 @@ from nite.video_mixer import TimeRecorder
 from nite.video_mixer.blender import BlendWithSong
 
 logger = configure_module_logging("nite.streamer")
+
 
 class TerminateTaskGroupError(Exception):
     """Exception raised to terminate a task group."""
@@ -65,7 +69,7 @@ class VideoCombinerSong(VideoCombiner):
         super().__init__(videos, blender)
         self.actions = actions
 
-    async def stream(self) -> None:
+    def stream(self) -> None:
         generators = [video.circular_frame_generator() for video in self.videos]
         logger.info("Starting stream")
         self.time_recorder.start_recording_if_not_started()
@@ -93,12 +97,12 @@ class VideoCombinerQueue(VideoCombiner):
         self,
         videos: List[VideoFramesPath],
         blender: BlendWithSong,
-        actions_queue: asyncio.Queue,
+        actions_queue: Queue,
     ) -> None:
         super().__init__(videos, blender)
         self._actions_queue = actions_queue
 
-    async def stream(self) -> None:
+    def stream(self) -> None:
         generators = [video.circular_frame_generator() for video in self.videos]
         logger.info("Starting stream")
         self.time_recorder.start_recording_if_not_started()
@@ -106,7 +110,7 @@ class VideoCombinerQueue(VideoCombiner):
             for frames in zip(*generators):
                 try:
                     blend_strength = self._actions_queue.get_nowait()
-                except asyncio.QueueEmpty:
+                except QueueEmpty:
                     # No blend strength received
                     blend_strength = None
 
@@ -120,15 +124,17 @@ class VideoCombinerQueue(VideoCombiner):
                     should_blend=should_blend,
                     blend_strength=blend_strength,
                 )
-
                 if self.time_recorder.has_period_passed:
                     logger.info(f"Keep-alive. Elapsed time: {self.time_recorder.elapsed_time_str}")
 
                 cv2.imshow("frame combined", frame)
                 cv2.waitKey(self.ms_to_wait)
-        except asyncio.CancelledError:
-            logger.info(f"Stream stopped. Elapsed time: {self.time_recorder.elapsed_time_str}")
+        except KeyboardInterrupt:
+            logger.info(
+                f"Stream stopped forcefully. Elapsed time: {self.time_recorder.elapsed_time_str}"
+            )
         finally:
+            logger.info(f"Stream finished. Elapsed time: {self.time_recorder.elapsed_time_str}")
             cv2.destroyAllWindows()
 
 
@@ -138,30 +144,28 @@ class VideoCombinerAudioListenerQueue(VideoCombiner):
         video_combiner_queue: VideoCombinerQueue,
         audio_listener: AudioListener,
         playback_time_sec: int,
-        actions_queue: asyncio.Queue,
+        actions_queue: Queue,
     ) -> None:
         self._video_combiner_queue = video_combiner_queue
         self._audio_listener = audio_listener
         self._playback_time_sec = playback_time_sec
         self._actions_queue = actions_queue
 
-    async def force_terminate_task_group():
-        """Used to force termination of a task group."""
-        raise TerminateTaskGroupError()
+    def stream(self) -> None:
+        logger.info(f"Starting stream for {self._playback_time_sec} seconds")
 
-    async def stream(self) -> None:
+        video_combiner_sub = Process(target=self._video_combiner_queue.stream, daemon=True)
+        audio_listener_sub = Process(target=self._audio_listener.start, daemon=True)
+
+        video_combiner_sub.start()
+        audio_listener_sub.start()
+
         try:
-            async with asyncio.TaskGroup() as group:
-                # spawn the audio listener with the video combiner
-                group.create_task(self._video_combiner_queue.stream())
-                group.create_task(self._audio_listener.start())
-
-                await asyncio.sleep(self._playback_time_sec)
-                # add an exception-raising task to force the group to terminate
-                group.create_task(self.force_terminate_task_group())
+            time.sleep(self._playback_time_sec)
+            logger.info("Stream finished")
         except KeyboardInterrupt:
             logger.info("Stream stopped forcefully")
-        except TerminateTaskGroupError:
-            logger.info("Stream stopped")
         finally:
-            self._actions_queue.shutdown()
+            audio_listener_sub.terminate()
+            video_combiner_sub.terminate()
+            self._actions_queue.close()

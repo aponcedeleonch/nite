@@ -1,5 +1,6 @@
 import asyncio
 from abc import ABC, abstractmethod
+from multiprocessing import Queue
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -96,7 +97,7 @@ class AudioFactory(NiteFactory):
         min_pitch: Optional[int],
         max_pitch: Optional[int],
         blend_falloff: float,
-        actions_queue: Optional[asyncio.Queue] = None,
+        actions_queue: Optional[Queue] = None,
     ) -> None:
         self._validate_settings(bpm_frequency, min_pitch, max_pitch)
         self.bpm_action = None
@@ -191,7 +192,7 @@ class VideoFactory(NiteFactory):
         video_2: Path,
         alpha: Path,
         blend_operation: str,
-        actions_queue: Optional[asyncio.Queue] = None,
+        actions_queue: Optional[Queue] = None,
         audio_actions: Optional[AudioActions] = None,
     ) -> None:
         self.width = width
@@ -279,7 +280,7 @@ class VideoCombinerFactory:
         if self.playback_time_sec is None:
             raise InitMixerError("Playback time must be set when initializing video stream.")
 
-        actions_queue = asyncio.Queue()
+        actions_queue: Queue = Queue()
         video_factory = VideoFactory(
             video_1=self.video_1,
             video_2=self.video_2,
@@ -299,7 +300,10 @@ class VideoCombinerFactory:
         video_combiner_queue = await video_factory.get_stream_config()
         audio_listener, _ = await audio_factory.get_stream_config()
         return VideoCombinerAudioListenerQueue(
-            video_combiner_queue, audio_listener, self.playback_time_sec, actions_queue
+            video_combiner_queue=video_combiner_queue,
+            audio_listener=audio_listener,
+            playback_time_sec=self.playback_time_sec,
+            actions_queue=actions_queue,
         )
 
     async def get_song_config(self) -> VideoCombinerSong:

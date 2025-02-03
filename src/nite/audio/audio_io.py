@@ -1,5 +1,6 @@
 import asyncio
 import struct
+from multiprocessing import Queue
 from pathlib import Path
 
 import librosa
@@ -21,7 +22,7 @@ class AudioListener:
         self,
         audio_processor: AudioProcessor,
         audio_actions: AudioActions,
-        actions_queue: asyncio.Queue,
+        actions_queue: Queue,
         audio_format: AudioFormat = short_format,
         sample_rate: int = AUDIO_SAMPLING_RATE,
         audio_channels: int = AUDIO_CHANNELS,
@@ -53,7 +54,7 @@ class AudioListener:
             self._actions_queue.put(blend_strength)
         return in_data, pyaudio.paContinue
 
-    async def start(self) -> None:
+    def start(self) -> None:
         paud = pyaudio.PyAudio()
         stream = paud.open(
             format=self._audio_format.pyaudio_format,
@@ -71,9 +72,15 @@ class AudioListener:
             while stream.is_active():
                 if self._time_recorder.has_period_passed:
                     logger.info(f"Keep-alive. Elapsed time: {self._time_recorder.elapsed_time_str}")
-        except asyncio.CancelledError:
-            logger.info(f"Audio listening stopped. Elapsed time: {self._time_recorder.elapsed_time_str}")
+        except KeyboardInterrupt:
+            logger.info(
+                f"Audio listening stopped forcefully. "
+                f"Elapsed time: {self._time_recorder.elapsed_time_str}"
+            )
         finally:
+            logger.info(
+                f"Closing audio listening. Elapsed time: {self._time_recorder.elapsed_time_str}"
+            )
             stream.close()
             paud.terminate()
 

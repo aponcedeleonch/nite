@@ -2,7 +2,6 @@ import copy
 import logging
 import logging.config
 import logging.handlers
-import warnings
 
 from nite.config import LOGGING_LEVEL
 
@@ -28,7 +27,6 @@ config_dictionary = {
 
 def configure_module_logging(logger_name: str):
     # Disable warnings. Librosa emits a lot of UserWarnings that are not relevant.
-    warnings.filterwarnings("ignore")
     logger_config = copy.deepcopy(config_dictionary)
     logging.config.dictConfig(logger_config)
     logger = logging.getLogger(logger_name)

@@ -1,5 +1,4 @@
 import asyncio
-from functools import wraps
 from pathlib import Path
 
 import click
@@ -198,7 +197,7 @@ def stream(ctx, playback_time_sec):
         playback_time_sec=playback_time_sec,
     )
     video_combiner = asyncio.run(video_combiner_factory.get_stream_config())
-    asyncio.run(video_combiner.stream())
+    video_combiner.stream()
 
 
 def main():
