@@ -9,8 +9,8 @@ from nite.logging import configure_module_logging
 
 logger = configure_module_logging("nite.audio.audio_file_to_stream")
 
-
 DEFAULT_CHUNK = 1024
+
 
 class AudioFileToStream:
     '''
@@ -48,7 +48,6 @@ class AudioFileToStream:
             audio_stream.close()
 
 
-
 class AudioWaveFileToStream:
     '''
     This class is responsible for converting an audio file in wav format to a stream using PyAudio.
@@ -71,7 +70,6 @@ class AudioWaveFileToStream:
 
     def play_as_stream(self):
         try:
-            
             self._play_audio()
             data = self.input_file.readframes(self.chunk)
             while data:

@@ -31,4 +31,4 @@ KEEPALIVE_TIMEOUT = int(float(os.getenv("KEEPALIVE_TIMEOUT", 5)))
 LOGGING_LEVEL = os.getenv("LOGGING_LEVEL", "INFO")
 
 # Variables for converting audio to stream
-STREAM_CHUNK = int(float(os.getenv("DEFAULT_CHUNK", 1024)))
+STREAM_CHUNK = int(float(os.getenv("STREAM_CHUNK", 1024)))
