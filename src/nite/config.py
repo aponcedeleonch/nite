@@ -25,7 +25,6 @@ BPM_BUFFER_BPMS_MAX = int(float(os.getenv("BPM_BUFFER_BPMS_MAX", 3)))
 BPM_BUFFER_SECS_REMOVE = int(float(os.getenv("BPM_BUFFER_SECS_REMOVE", 0)))
 
 # Variables mainly for the video mixer
-TERMINATE_MESSAGE = os.getenv("TERMINATE_MESSAGE", "Terminate")
 KEEPALIVE_TIMEOUT = int(float(os.getenv("KEEPALIVE_TIMEOUT", 5)))
 
 LOGGING_LEVEL = os.getenv("LOGGING_LEVEL", "INFO")
