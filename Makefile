@@ -3,6 +3,7 @@
 # Expected to be a path set by the user
 # VENV?=~/py_venvs/nite_env
 VENV?=./venv
+PORT?=9090
 
 install:
 	python3.12 -m venv ${VENV};
@@ -24,5 +25,11 @@ lint:
 
 format:
 	hatch run style:format
+
+run_web:
+	uvicorn nite.web.v1:app --host 0.0.0.0 --port ${PORT}
+
+run_web_dev:
+	uvicorn nite.web.v1:app --host 0.0.0.0 --port ${PORT} --reload
 
 all: format lint typecheck test
