@@ -27,9 +27,9 @@ format:
 	hatch run style:format
 
 run_web:
-	uvicorn nite.web.v1:app --host 0.0.0.0 --port ${PORT}
+	uvicorn nite.api.v1:app --host 0.0.0.0 --port ${PORT}
 
 run_web_dev:
-	uvicorn nite.web.v1:app --host 0.0.0.0 --port ${PORT} --reload
+	uvicorn nite.api.v1:app --host 0.0.0.0 --port ${PORT} --reload
 
 all: format lint typecheck test
