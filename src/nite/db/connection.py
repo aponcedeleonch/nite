@@ -127,8 +127,12 @@ class DbWriter(NiteDb):
             RETURNING *
             """
         )
-        new_segment = await self._exec_upsert_pydantic_model(segment_db, sql)
-        return new_segment  # type: ignore[return-value]
+        try:
+            new_segment = await self._exec_upsert_pydantic_model(segment_db, sql)
+            return new_segment  # type: ignore[return-value]
+        except IntegrityError as e:
+            str_error = f"Failed to create segment: {e}"
+            raise AlreadyExistsError(str_error)
 
     async def associate_presentation_segments(
         self, presentation_id: str, segment_create: v1_models.PresentationSegmentsCreate
