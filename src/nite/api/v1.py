@@ -40,7 +40,7 @@ async def create_presentation(
     try:
         return await db_writer.create_presentation(presentation_to_create.to_db_model())
     except db_connection.AlreadyExistsError:
-        str_error = f"Presentation with name {presentation_to_create.name} already exists"
+        str_error = "Presentation with supplied name already exists"
         logger.error(str_error)
         raise HTTPException(status_code=409, detail=str_error)
     except db_connection.NiteDbError:
@@ -63,7 +63,7 @@ async def get_presentation_by_id(presentation_id: UUID) -> v1_models.Presentatio
     try:
         await db_reader.get_presentation(str(presentation_id))
     except db_connection.DoesNotExistError:
-        str_error = f"Presentation with ID {presentation_id} does not exist"
+        str_error = "Presentation with supplied ID does not exist"
         logger.error(str_error)
         raise HTTPException(status_code=404, detail=str_error)
 
@@ -73,18 +73,23 @@ async def get_presentation_by_id(presentation_id: UUID) -> v1_models.Presentatio
         )
         return await v1_models.PresentationWithSegments.from_db_model(presentation_with_segmnets)
     except db_connection.PresentationWithNoSegmentsError:
-        str_error = f"Presentation with ID {presentation_id} has no segments"
+        str_error = "Presentation with ID has no segments"
         logger.error(str_error)
         raise HTTPException(status_code=404, detail=str_error)
     except Exception:
-        str_error = f"Error retrieving presentation: {presentation_id}"
+        str_error = "Error retrieving presentation:"
         logger.exception(str_error)
         raise HTTPException(status_code=500, detail=str_error)
 
 
 @v1.post("/video_mixer/segments")
 async def create_segment(segment_to_create: v1_models.SegmentCreate) -> db_models.Segment:
-    return await db_writer.create_segment(segment_to_create.to_db_model())
+    try:
+        return await db_writer.create_segment(segment_to_create.to_db_model())
+    except db_connection.AlreadyExistsError:
+        str_error = "Segment with ID already exists"
+        logger.error(str_error)
+        raise HTTPException(status_code=409, detail=str_error)
 
 
 @v1.get("/video_mixer/segments")
