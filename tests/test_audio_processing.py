@@ -180,7 +180,9 @@ async def test_detect_pitch(pitch_detector: PitchDetector):
     detected_pitch = await pitch_detector.detect(audio_sample)
 
     assert detected_pitch is not None
-    assert isinstance(detected_pitch, ChromaIndex)
+    assert isinstance(detected_pitch, list)
+    assert len(detected_pitch) == 1
+    assert isinstance(detected_pitch[0], ChromaIndex)
 
 
 @pytest.mark.asyncio

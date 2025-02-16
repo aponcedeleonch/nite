@@ -11,3 +11,6 @@ __pycache__
 
 # For the moment the notebooks are just meant for local experiments
 **/*.ipynb
+
+# SQLite database
+nite.db
