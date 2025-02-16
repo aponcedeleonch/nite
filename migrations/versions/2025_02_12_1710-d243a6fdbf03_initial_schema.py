@@ -47,10 +47,12 @@ def upgrade() -> None:
         """
         CREATE TABLE presentations (
             id TEXT PRIMARY KEY,  -- UUID stored as TEXT
+            name TEXT NOT NULL,
             width INTEGER NOT NULL,
             height INTEGER NOT NULL,
             updated_at DATETIME NOT NULL,
-            created_at DATETIME NOT NULL
+            created_at DATETIME NOT NULL,
+            UNIQUE (name)
         );
         """
     )
@@ -60,6 +62,8 @@ def upgrade() -> None:
         CREATE TABLE presentations_segments (
             segment_id TEXT NOT NULL,
             presentation_id TEXT NOT NULL,
+            from_seconds FLOAT NOT NULL,  -- The start time of the segment in the presentation
+            to_seconds FLOAT NOT NULL,   -- The end time of the segment in the presentation
             created_at DATETIME NOT NULL,
             FOREIGN KEY (segment_id) REFERENCES segments (id) ON DELETE CASCADE,
             FOREIGN KEY (presentation_id) REFERENCES presentations (id) ON DELETE CASCADE,

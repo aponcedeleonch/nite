@@ -20,7 +20,11 @@ config_dictionary = {
             "formatter": "process",
         }
     },
-    "loggers": {"nite": {"level": LOGGING_LEVEL, "handlers": ["console"], "propagate": False}},
+    "loggers": {
+        "nite": {"level": LOGGING_LEVEL, "handlers": ["console"], "propagate": False},
+        "uvicorn": {"level": LOGGING_LEVEL, "handlers": ["console"], "propagate": False},
+        "uvicorn.error": {"level": LOGGING_LEVEL, "handlers": ["console"], "propagate": False},
+    },
     "root": {"level": LOGGING_LEVEL, "handlers": ["console"], "propagate": False},
 }
 

@@ -56,6 +56,7 @@ class SegmentCreate(BaseModel):
 
 class PresentationCreate(BaseModel):
     id: Optional[str] = None  # Optional to allow for creation of new presentations
+    name: str
     width: int
     height: int
     updated_at: Optional[datetime] = None  # Optional to allow for creation of new presentations
@@ -74,6 +75,7 @@ class PresentationCreate(BaseModel):
     def to_db_model(self) -> db_models.Presentation:
         return db_models.Presentation(
             id=self.id,
+            name=self.name,
             width=self.width,
             height=self.height,
             updated_at=self.updated_at,
@@ -81,13 +83,19 @@ class PresentationCreate(BaseModel):
         )
 
 
+class SegmentTimes(BaseModel):
+    segment_id: str
+    from_seconds: float
+    to_seconds: float
+
+
 class PresentationSegmentsCreate(BaseModel):
-    segment_ids: List[str]
+    segments: List[SegmentTimes]
     created_at: Optional[datetime] = None  # Optional to allow for creation of new presentations
 
-    @field_validator("segment_ids", mode="after")
+    @field_validator("segments", mode="after")
     @classmethod
-    def is_even(cls, value: List[str]) -> List[str]:
+    def check_segments_exist(cls, value: List[str]) -> List[str]:
         if len(value) == 0:
             raise ValueError(f"{value} is empty")
         return value
@@ -97,3 +105,74 @@ class PresentationSegmentsCreate(BaseModel):
         if not self.created_at:
             self.created_at = datetime.now()
         return self
+
+
+class PresentationWithNumSegments(db_models.Presentation):
+    num_segments: int
+
+
+class SegmentWithDuration(db_models.Segment):
+    from_seconds: float
+    to_seconds: float
+
+
+class PresentationWithSegments(db_models.Presentation):
+    segments_with_duration: List[SegmentWithDuration]
+
+    @classmethod
+    async def from_db_model(
+        cls, presentation_with_segments: List[db_models.PresentationSegmentsTimingRow]
+    ) -> Self:
+        segments = [
+            SegmentWithDuration(
+                id=row.segment_id,
+                video_1=row.video_1,
+                video_2=row.video_2,
+                alpha=row.alpha,
+                bpm_frequency=row.bpm_frequency,
+                min_pitch=row.min_pitch,
+                max_pitch=row.max_pitch,
+                blend_operation=row.blend_operation,
+                blend_falloff=row.blend_falloff,
+                from_seconds=row.from_seconds,
+                to_seconds=row.to_seconds,
+                updated_at=row.segment_updated_at,
+                created_at=row.segment_created_at,
+            )
+            for row in presentation_with_segments
+        ]
+        return cls(
+            id=presentation_with_segments[0].id,
+            name=presentation_with_segments[0].name,
+            width=presentation_with_segments[0].width,
+            height=presentation_with_segments[0].height,
+            updated_at=presentation_with_segments[0].updated_at,
+            created_at=presentation_with_segments[0].created_at,
+            segments_with_duration=segments,
+        )
+
+
+class SegmentsWithPresentations(db_models.Segment):
+    presentation_names: List[str]
+
+    @classmethod
+    async def from_db_model(
+        cls, segments_with_presentations: List[db_models.SegmentWithPresentationsRow]
+    ) -> List[Self]:
+        return [
+            cls(
+                id=segments_with_presentations.id,
+                video_1=segments_with_presentations.video_1,
+                video_2=segments_with_presentations.video_2,
+                alpha=segments_with_presentations.alpha,
+                bpm_frequency=segments_with_presentations.bpm_frequency,
+                min_pitch=segments_with_presentations.min_pitch,
+                max_pitch=segments_with_presentations.max_pitch,
+                blend_operation=segments_with_presentations.blend_operation,
+                blend_falloff=segments_with_presentations.blend_falloff,
+                updated_at=segments_with_presentations.updated_at,
+                created_at=segments_with_presentations.created_at,
+                presentation_names=segments_with_presentations.presentation_names_list,
+            )
+            for segments_with_presentations in segments_with_presentations
+        ]
