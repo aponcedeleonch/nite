@@ -162,9 +162,11 @@ class VideoWriter:
     #     logger.info(f"Video {self.video_metadata.name} file: {output_video} written")
 
     async def to_frames(self, frames: AsyncIterator[cv2.typing.MatLike]) -> None:
-        async for i_frame, frame in frames:
+        i_frame = 0
+        async for frame in frames:
             out_frame = self.output_dir / f"frame{i_frame:0{self.video_metadata.zero_padding}}.png"
             cv2.imwrite(str(out_frame), frame)
+            i_frame += 1
         else:
             logger.info(f"Frames of {self.video_metadata.name} written to {self.output_dir}")
 
