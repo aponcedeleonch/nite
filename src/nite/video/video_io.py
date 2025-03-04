@@ -2,14 +2,14 @@ import json
 import time
 from datetime import timedelta
 from pathlib import Path
-from typing import Optional
+from typing import AsyncIterator, Optional
 
 import cv2
 from pydantic import BaseModel
 
 from nite.config import METADATA_FILENAME, SUFFIX_NITE_VIDEO_FOLDER, VIDEO_LOCATION
 from nite.logging import configure_module_logging
-from nite.video.video import VideoFrames, VideoFramesImg, VideoFramesPath, VideoMetadata
+from nite.video.video import VideoFramesPath, VideoMetadata
 
 logger = configure_module_logging("nite.video_io")
 
@@ -19,7 +19,7 @@ class FramesNotFoundError(Exception):
 
 
 class VideoReader:
-    def _read_metadata_from_video(self, input_video: Path) -> VideoMetadata:
+    async def read_metadata_from_video(self, input_video: Path) -> VideoMetadata:
         video_capture = cv2.VideoCapture(str(input_video))
         num_frames = video_capture.get(cv2.CAP_PROP_FRAME_COUNT)
         fps = video_capture.get(cv2.CAP_PROP_FPS)
@@ -51,12 +51,12 @@ class VideoReader:
         logger.info(f"Metadata read from JSON {metadata.name}. Metadata: {metadata}")
         return metadata
 
-    async def from_video(self, input_video: Path) -> VideoFramesImg:
+    async def from_video(
+        self, input_video: Path, metadata: VideoMetadata
+    ) -> AsyncIterator[cv2.typing.MatLike]:
         start_time = time.time()
-        metadata = self._read_metadata_from_video(input_video)
         video_capture = cv2.VideoCapture(str(input_video))
         frame_count = 0
-        frames_imgs = []
         logger.info(
             f"Converting video {metadata.name} to frames. Number of frames: {metadata.num_frames}"
         )
@@ -65,7 +65,8 @@ class VideoReader:
             ret, frame = video_capture.read()
             if not ret:
                 continue
-            frames_imgs.append(frame)
+            # We yield the frame to not keep all the frames in memory
+            yield frame
             frame_count += 1
             if frame_count % 100 == 0:
                 logger.info(f"Frames extracted: {frame_count}/{metadata.num_frames}")
@@ -75,7 +76,6 @@ class VideoReader:
         logger.info(
             f"Video {metadata.name} converted to frames in {timedelta(seconds=elapsed_time)} secs"
         )
-        return VideoFramesImg(metadata=metadata, frames_imgs=frames_imgs)
 
     async def from_frames(
         self, input_frames_dir: Path, width: int, height: int, is_alpha: bool = False
@@ -127,42 +127,46 @@ class VideoReader:
 
 
 class VideoWriter:
-    def __init__(self, video: VideoFrames, output_base_dir: Optional[Path] = None) -> None:
-        self.video = video
+    def __init__(
+        self, video_metadata: VideoMetadata, output_base_dir: Optional[Path] = None
+    ) -> None:
+        self.video_metadata = video_metadata
         if not output_base_dir:
             output_base_dir_path = Path(".")
         else:
             output_base_dir_path = Path(output_base_dir)
 
-        video_folder = f"{self.video.metadata.name}-{SUFFIX_NITE_VIDEO_FOLDER}"
-        resolution_folder = f"{self.video.metadata.width}x{self.video.metadata.height}"
+        video_folder = f"{self.video_metadata.name}-{SUFFIX_NITE_VIDEO_FOLDER}"
+        resolution_folder = f"{self.video_metadata.width}x{self.video_metadata.height}"
         self.output_dir = output_base_dir_path / video_folder / resolution_folder
         self.output_dir.mkdir(exist_ok=True, parents=True)
 
-    async def to_video(self) -> None:
-        # Force mp4 extension
-        # codecs: https://softron.zendesk.com/hc/en-us/articles/207695697-List-of-FourCC-codes-for-video-codecs
-        fourcc = cv2.VideoWriter.fourcc(*"mp4v")
-        output_video = self.output_dir / f"{self.video.metadata.name}_reconstructed.mp4"
+        # Store the metadata in the output directory as JSON
+        self.video_metadata.to_json(self.output_dir)
 
-        self.video.metadata.to_json(self.output_dir)
+    # async def to_video(self) -> None:
+    #     # Force mp4 extension
+    #     # codecs: https://softron.zendesk.com/hc/en-us/articles/207695697-List-of-FourCC-codes-for-video-codecs
+    #     fourcc = cv2.VideoWriter.fourcc(*"mp4v")
+    #     output_video = self.output_dir / f"{self.video_metadata.name}_reconstructed.mp4"
 
-        video_dims = (self.video.metadata.width, self.video.metadata.height)
-        video_writer = cv2.VideoWriter(
-            str(output_video), fourcc, self.video.metadata.fps, video_dims
-        )
-        for frame in self.video.frame_as_img:
-            video_writer.write(frame)
-        video_writer.release()
-        logger.info(f"Video {self.video.metadata.name} file: {output_video} written")
+    #     self.video_metadata.to_json(self.output_dir)
 
-    async def to_frames(self) -> None:
-        self.video.metadata.to_json(self.output_dir)
-        for i_frame, frame in enumerate(self.video.frame_as_img):
-            out_frame = self.output_dir / f"frame{i_frame:0{self.video.metadata.zero_padding}}.png"
+    #     video_dims = (self.video_metadata.width, self.video_metadata.height)
+    #     video_writer = cv2.VideoWriter(
+    #         str(output_video), fourcc, self.video_metadata.fps, video_dims
+    #     )
+    #     for frame in self.video.frame_as_img:
+    #         video_writer.write(frame)
+    #     video_writer.release()
+    #     logger.info(f"Video {self.video_metadata.name} file: {output_video} written")
+
+    async def to_frames(self, frames: AsyncIterator[cv2.typing.MatLike]) -> None:
+        async for i_frame, frame in frames:
+            out_frame = self.output_dir / f"frame{i_frame:0{self.video_metadata.zero_padding}}.png"
             cv2.imwrite(str(out_frame), frame)
-
-        logger.info(f"Frames of {self.video.metadata.name} written to {self.output_dir}")
+        else:
+            logger.info(f"Frames of {self.video_metadata.name} written to {self.output_dir}")
 
 
 class VideoStream(BaseModel):
@@ -202,9 +206,11 @@ class NiteVideo:
 
     async def _try_to_load_video(self) -> None:
         output_video_path = Path(VIDEO_LOCATION)
-        video_frames_img = await VideoReader().from_video(self.video_path)
-        video_writer = VideoWriter(video_frames_img, output_base_dir=output_video_path)
-        await video_writer.to_frames()
+        video_reader = VideoReader()
+        video_metadata = await video_reader.read_metadata_from_video(self.video_path)
+        video_writer = VideoWriter(video_metadata=video_metadata, output_base_dir=output_video_path)
+        frames = video_reader.from_video(self.video_path, video_metadata)
+        await video_writer.to_frames(frames)
 
     async def load_video(self) -> VideoFramesPath:
         try:
