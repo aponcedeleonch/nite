@@ -1,7 +1,10 @@
+from typing import List
+
 import numpy as np
 import pytest
 
 from nite.audio import audio_action
+from nite.audio.audio_processing import ChromaIndex
 
 
 @pytest.mark.parametrize("bpm,expected_duration", [(120, 2), (0, np.inf), (None, np.inf)])
@@ -92,3 +95,50 @@ async def test_bpm_act(
     bpm_action.action_period_timeout_sec = action_period_timeout_sec
     result_should_act = await bpm_action.act(time_in_ms)
     assert result_should_act is expected_should_act
+
+
+def test_init_action_pitch_fail_same():
+    with pytest.raises(audio_action.InvalidAudioFeatureError):
+        audio_action.AudioActionPitch(min_pitch=ChromaIndex.e, max_pitch=ChromaIndex.e)
+
+
+def test_init_action_pitch_fail_less():
+    with pytest.raises(audio_action.InvalidAudioFeatureError):
+        audio_action.AudioActionPitch(min_pitch=ChromaIndex.e, max_pitch=ChromaIndex.d_sharp)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "min_pitch,max_pitch,chromas,total_time_in_ms,time_in_ms,expected_should_act",
+    [
+        (ChromaIndex.c, ChromaIndex.b, None, 1000, 1, False),
+        (ChromaIndex.c, ChromaIndex.b, [ChromaIndex.e, ChromaIndex.f], 1000, 1, True),
+        (ChromaIndex.a, ChromaIndex.b, [ChromaIndex.e, ChromaIndex.f], 1000, 1, False),
+        (ChromaIndex.d_sharp, ChromaIndex.e, [ChromaIndex.e, ChromaIndex.f], 1000, 1, False),
+        (ChromaIndex.f, ChromaIndex.f_sharp, [ChromaIndex.e, ChromaIndex.f], 1000, 1, True),
+        (ChromaIndex.f, ChromaIndex.f_sharp, [ChromaIndex.e, ChromaIndex.f], 20, 1, False),
+    ],
+)
+async def test_pitch_act(
+    min_pitch: ChromaIndex,
+    max_pitch: ChromaIndex,
+    chromas: List[ChromaIndex],
+    total_time_in_ms: int,
+    time_in_ms: int,
+    expected_should_act: bool,
+):
+    action_pitch = audio_action.AudioActionPitch(min_pitch=min_pitch, max_pitch=max_pitch)
+    action_pitch.chromas = chromas
+    action_pitch.total_time_in_ms = total_time_in_ms
+    result_should_act = await action_pitch.act(time_in_ms)
+    assert result_should_act is expected_should_act
+
+
+@pytest.mark.asyncio
+async def test_error_pitch_act():
+    action_pitch = audio_action.AudioActionPitch(min_pitch=ChromaIndex.c, max_pitch=ChromaIndex.b)
+    action_pitch.chromas = [ChromaIndex.e]
+    action_pitch.total_time_in_ms = 1000
+    time_in_ms = 1
+    with pytest.raises(audio_action.InvalidPitchSecondError):
+        await action_pitch.act(time_in_ms)
