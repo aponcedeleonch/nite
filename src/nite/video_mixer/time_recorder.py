@@ -2,12 +2,12 @@ import time
 from datetime import timedelta
 from typing import Optional
 
+import structlog
 from pydantic import BaseModel, computed_field, field_validator
 
 from nite.config import KEEPALIVE_TIMEOUT
-from nite.logging import configure_module_logging
 
-logger = configure_module_logging("nite.time_recorder")
+logger = structlog.get_logger("nite.time_recorder")
 
 
 class TimeRecorderError(Exception):

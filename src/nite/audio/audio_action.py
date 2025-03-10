@@ -4,11 +4,11 @@ from enum import Enum
 from typing import List, Optional, Tuple
 
 import numpy as np
+import structlog
 
 from nite.audio.audio_processing import AudioSampleFeatures, ChromaIndex
-from nite.logging import configure_module_logging
 
-logger = configure_module_logging("nite.audio_action")
+logger = structlog.get_logger("nite.audio_action")
 
 
 class InvalidAudioFeatureError(Exception):

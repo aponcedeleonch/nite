@@ -3,14 +3,14 @@ from contextlib import asynccontextmanager
 from typing import List
 from uuid import UUID
 
+import structlog
 from fastapi import APIRouter, FastAPI, HTTPException
 
 from nite.api import v1_models
 from nite.db import connection as db_connection
 from nite.db import models as db_models
-from nite.logging import configure_module_logging
 
-logger = configure_module_logging("nite.v1")
+logger = structlog.get_logger("nite.v1")
 
 
 @asynccontextmanager

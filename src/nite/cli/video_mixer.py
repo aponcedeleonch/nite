@@ -5,6 +5,7 @@ import click
 
 from nite.audio.audio_action import BPMActionFrequency
 from nite.audio.audio_processing import ChromaIndex
+from nite.nite_logging import configure_nite_logging
 from nite.video_mixer.blender import BlendModes
 from nite.video_mixer.factories import VideoCombinerFactory
 
@@ -116,6 +117,7 @@ def cli(
     ctx.obj["max_pitch"] = PITCH_CHOICES.get(max_pitch, None)
     ctx.obj["blend_operation"] = blend_operation
     ctx.obj["blend_falloff"] = blend_falloff
+    configure_nite_logging()
 
 
 @cli.command()

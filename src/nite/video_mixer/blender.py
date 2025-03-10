@@ -4,10 +4,9 @@ from typing import List, Optional
 
 import cv2
 import numpy as np
+import structlog
 
-from nite.logging import configure_module_logging
-
-logger = configure_module_logging("nite.blender")
+logger = structlog.get_logger("nite.blender")
 
 
 class Blender(ABC):

@@ -6,15 +6,15 @@ from pathlib import Path
 import librosa
 import numpy as np
 import pyaudio
+import structlog
 
 from nite.audio.audio import AudioFormat, short_format
 from nite.audio.audio_action import AudioActions
 from nite.audio.audio_processing import AudioProcessor, AudioSampleFeatures
 from nite.config import AUDIO_CHANNELS, AUDIO_SAMPLING_RATE
-from nite.logging import configure_module_logging
 from nite.video_mixer.time_recorder import TimeRecorder
 
-logger = configure_module_logging("nite.audio_listener")
+logger = structlog.get_logger("nite.audio_listener")
 
 
 class AudioListener:
