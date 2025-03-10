@@ -24,7 +24,7 @@ class BPMActionFrequency(int, Enum):
 
 class AudioAction(ABC):
     @abstractmethod
-    async def act(self, time_in_ms: int) -> Tuple[bool, float]:
+    async def act(self, time_in_ms: int) -> bool:
         pass
 
 
@@ -92,14 +92,14 @@ class AudioActionBPM(AudioAction):
             bar_duration_sec, self.bpm_action_frequency, self.beats_per_compass
         )
 
-    async def act(self, time_in_ms: int) -> Tuple[bool, float]:
+    async def act(self, time_in_ms: int) -> bool:
         """
         Check if the action period has passed and reset the time since last timeout.
         """
         self.time_since_last_timeout_ms += time_in_ms
 
         if self.bpm is None or self.action_period_timeout_sec is None:
-            return False, 0.0
+            return False
 
         time_since_last_timeout_sec = self.time_since_last_timeout_ms / 1000
         if time_since_last_timeout_sec >= self.action_period_timeout_sec:
@@ -111,8 +111,8 @@ class AudioActionBPM(AudioAction):
             # Calculate the offset to avoid losing time and the error to be accumulated
             offset_sec = time_since_last_timeout_sec - self.action_period_timeout_sec
             self.time_since_last_timeout_ms = int(offset_sec * 1000)
-            return True, 1.0
-        return False, 0.0
+            return True
+        return False
 
 
 class AudioActionPitch(AudioAction):
@@ -136,7 +136,7 @@ class AudioActionPitch(AudioAction):
         """
         self.chromas = chromas
 
-    async def act(self, time_in_ms: int) -> Tuple[bool, float]:
+    async def act(self, time_in_ms: int) -> bool:
         """
         Act based on the chroma detected from the audio processing.
 
@@ -147,7 +147,7 @@ class AudioActionPitch(AudioAction):
 
         # Handle the case chromas is None
         if self.chromas is None:
-            return False, 0.0
+            return False
 
         time_in_sec = int(round(self.total_time_in_ms / 1000))
         chroma_for_sec = self.chromas[time_in_sec]
@@ -156,8 +156,8 @@ class AudioActionPitch(AudioAction):
             logger.info(
                 f"Chroma: {chroma_for_sec} Min pitch: {self.min_pitch} Max pitch: {self.max_pitch}"
             )
-            return True, 1.0
-        return False, 0.0
+            return True
+        return False
 
 
 class AudioActions(AudioAction):
@@ -192,7 +192,7 @@ class AudioActions(AudioAction):
                 tasks.append(tg.create_task(action.act(time_in_ms)))
 
         # Check if according to any action we should act (blend)
-        should_blend_per_action = [task.result()[0] for task in tasks]
+        should_blend_per_action = [task.result() for task in tasks]
         should_blend = any(should_blend_per_action)
 
         # If we should blend means the action just happened, so we reset the time since last action
