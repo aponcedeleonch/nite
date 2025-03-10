@@ -34,7 +34,8 @@ classifiers = [
 [dependency-groups]
 test = [
   "pytest==8.3.3",
-  "pytest-asyncio==0.25.3"
+  "pytest-asyncio==0.25.3",
+  "pytest-cov>=6.0.0"
 ]
 format = [
   "ruff==0.9.3"
