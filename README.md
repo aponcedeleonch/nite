@@ -5,22 +5,16 @@
 ### Prerequisites
 
 - [Python 3.12](https://www.python.org/downloads/)
+- Recommended: [uv](https://docs.astral.sh/uv/getting-started/installation/). A convenient dependecy manager for python.
 
-### Installation with virtual environment (Optional recommendation)
+### Installation with uv (Recommended)
 
-After installing python 3.12 open a terminal in your favorite Operating System (OS) and run:
+Open a terminal in your favorite Operating System (OS) and run:
 ```sh
 $ make install
 ```
 
-This should install a python virtual environment wiht all the dependencies needed. The name of the virtualenv created wiht the previous make command should be `venv`.
-
-If everything went good, activate the virtual environment.
-```sh
-$ source venv/bin/activate
-```
-
-### Installing NiteLabs VideoMixer (without virtual environment)
+### Installing NiteLabs VideoMixer (without uv)
 
 Open a terminal of your choice and install with:
 ```sh
