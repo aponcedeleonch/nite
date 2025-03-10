@@ -1,30 +1,26 @@
 .PHONY: install, clean, typecheck, lint, format
 
-# Expected to be a path set by the user
-# VENV?=~/py_venvs/nite_env
-VENV?=./venv
+# Default port for the web server
 PORT?=9090
 
 install:
-	python3.12 -m venv ${VENV};
-	source ${VENV}/bin/activate; \
-	pip install --upgrade pip; \
-	pip install -e .; \
+	uv sync --all-groups;
 
 clean:
-	rm -rf ${VENV}; \
+	rm -rf .venv;
 
 typecheck:
-	hatch run test:typing;
+	uv run mypy src;
 
 test:
-	hatch run test:unit;
+	uv run pytest tests;
 
 lint:
-	hatch run style:check
+	uv run ruff check;
 
 format:
-	hatch run style:format
+	uv run ruff format; \
+	uv run ruff check --fix;
 
 run_web:
 	uvicorn nite.api.v1:app --host 0.0.0.0 --port ${PORT} --log-level debug

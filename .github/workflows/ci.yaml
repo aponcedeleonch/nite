@@ -31,11 +31,14 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y portaudio19-dev python3-pyaudio
 
+    - name: Install uv
+      uses: astral-sh/setup-uv@f94ec6bedd8674c4426838e6b50417d36b6ab231
+      with:
+        # Install a specific version of uv.
+        version: "0.6.5"
+
     - name: Install Project
       run: make install
-
-    - name: Load venv
-      run: source ./venv/bin/activate
 
     - name: Run linting
       run: make lint
