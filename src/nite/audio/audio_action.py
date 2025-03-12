@@ -213,7 +213,7 @@ class AudioActions(AudioAction):
             # If we shouldn't blend, we calculate the blend strength based on the blend falloff
             self.time_since_last_action_ms += time_in_ms
 
-            # There is faloff time, we can finish here
+            # There is no faloff time, we can finish here
             if self.blend_falloff_sec == 0:
                 return False, 0.0
 
