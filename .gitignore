@@ -14,3 +14,6 @@ __pycache__
 
 # SQLite database
 nite.db
+
+# Ignore the coverage report
+.coverage

@@ -15,6 +15,10 @@ class InvalidAudioFeatureError(Exception):
     pass
 
 
+class InvalidPitchSecondError(Exception):
+    pass
+
+
 class BPMActionFrequency(int, Enum):
     kick = 0
     compass = 1
@@ -123,7 +127,7 @@ class AudioActionPitch(AudioAction):
         TODO: This class needs more testing to ensure it works as expected.
         """
         if min_pitch >= max_pitch:
-            raise ValueError("Min pitch must be less than max pitch")
+            raise InvalidAudioFeatureError("Min pitch must be less than max pitch")
 
         self.min_pitch = min_pitch
         self.max_pitch = max_pitch
@@ -139,8 +143,6 @@ class AudioActionPitch(AudioAction):
     async def act(self, time_in_ms: int) -> Tuple[bool, float]:
         """
         Act based on the chroma detected from the audio processing.
-
-        TODO: This method needs more testing to ensure it works as expected.
         """
 
         self.total_time_in_ms += time_in_ms
@@ -150,7 +152,14 @@ class AudioActionPitch(AudioAction):
             return False, 0.0
 
         time_in_sec = int(round(self.total_time_in_ms / 1000))
-        chroma_for_sec = self.chromas[time_in_sec]
+
+        try:
+            chroma_for_sec = self.chromas[time_in_sec]
+        except IndexError:
+            raise InvalidPitchSecondError(
+                "Tried to select a second from the chromas we haven't calculated"
+            )
+
         # Check if the chromas are within the range
         if self.min_pitch <= chroma_for_sec <= self.max_pitch:
             logger.info(
@@ -192,7 +201,7 @@ class AudioActions(AudioAction):
                 tasks.append(tg.create_task(action.act(time_in_ms)))
 
         # Check if according to any action we should act (blend)
-        should_blend_per_action = [task.result()[0] for task in tasks]
+        should_blend_per_action = [task.result() for task in tasks]
         should_blend = any(should_blend_per_action)
 
         # If we should blend means the action just happened, so we reset the time since last action
@@ -204,7 +213,7 @@ class AudioActions(AudioAction):
             # If we shouldn't blend, we calculate the blend strength based on the blend falloff
             self.time_since_last_action_ms += time_in_ms
 
-            # There is faloff time, we can finish here
+            # There is no faloff time, we can finish here
             if self.blend_falloff_sec == 0:
                 return False, 0.0
 
