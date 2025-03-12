@@ -93,7 +93,7 @@ async def test_bpm_act(
     bpm_action.bpm = bpm
     bpm_action.time_since_last_timeout_ms = time_since_last_timeout_ms
     bpm_action.action_period_timeout_sec = action_period_timeout_sec
-    result_should_act = await bpm_action.act(time_in_ms)
+    result_should_act, _ = await bpm_action.act(time_in_ms)
     assert result_should_act is expected_should_act
 
 
@@ -130,7 +130,7 @@ async def test_pitch_act(
     action_pitch = audio_action.AudioActionPitch(min_pitch=min_pitch, max_pitch=max_pitch)
     action_pitch.chromas = chromas
     action_pitch.total_time_in_ms = total_time_in_ms
-    result_should_act = await action_pitch.act(time_in_ms)
+    result_should_act, _ = await action_pitch.act(time_in_ms)
     assert result_should_act is expected_should_act
 
 
