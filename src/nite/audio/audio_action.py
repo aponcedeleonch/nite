@@ -28,7 +28,7 @@ class BPMActionFrequency(int, Enum):
 
 class AudioAction(ABC):
     @abstractmethod
-    async def act(self, time_in_ms: int) -> bool:
+    async def act(self, time_in_ms: int) -> Tuple[bool, float]:
         pass
 
 
@@ -96,14 +96,14 @@ class AudioActionBPM(AudioAction):
             bar_duration_sec, self.bpm_action_frequency, self.beats_per_compass
         )
 
-    async def act(self, time_in_ms: int) -> bool:
+    async def act(self, time_in_ms: int) -> Tuple[bool, float]:
         """
         Check if the action period has passed and reset the time since last timeout.
         """
         self.time_since_last_timeout_ms += time_in_ms
 
         if self.bpm is None or self.action_period_timeout_sec is None:
-            return False
+            return False, 0.0
 
         time_since_last_timeout_sec = self.time_since_last_timeout_ms / 1000
         if time_since_last_timeout_sec >= self.action_period_timeout_sec:
@@ -115,8 +115,8 @@ class AudioActionBPM(AudioAction):
             # Calculate the offset to avoid losing time and the error to be accumulated
             offset_sec = time_since_last_timeout_sec - self.action_period_timeout_sec
             self.time_since_last_timeout_ms = int(offset_sec * 1000)
-            return True
-        return False
+            return True, 1.0
+        return False, 0.0
 
 
 class AudioActionPitch(AudioAction):
@@ -140,7 +140,7 @@ class AudioActionPitch(AudioAction):
         """
         self.chromas = chromas
 
-    async def act(self, time_in_ms: int) -> bool:
+    async def act(self, time_in_ms: int) -> Tuple[bool, float]:
         """
         Act based on the chroma detected from the audio processing.
         """
@@ -149,7 +149,7 @@ class AudioActionPitch(AudioAction):
 
         # Handle the case chromas is None
         if self.chromas is None:
-            return False
+            return False, 0.0
 
         time_in_sec = int(round(self.total_time_in_ms / 1000))
 
@@ -165,8 +165,8 @@ class AudioActionPitch(AudioAction):
             logger.info(
                 f"Chroma: {chroma_for_sec} Min pitch: {self.min_pitch} Max pitch: {self.max_pitch}"
             )
-            return True
-        return False
+            return True, 1.0
+        return False, 0.0
 
 
 class AudioActions(AudioAction):
