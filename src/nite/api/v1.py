@@ -3,18 +3,20 @@ from contextlib import asynccontextmanager
 from typing import List
 from uuid import UUID
 
+import structlog
 from fastapi import APIRouter, FastAPI, HTTPException
 
 from nite.api import v1_models
 from nite.db import connection as db_connection
 from nite.db import models as db_models
-from nite.logging import configure_module_logging
+from nite.nite_logging import configure_nite_logging
 
-logger = configure_module_logging("nite.v1")
+logger = structlog.get_logger("nite.v1")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    configure_nite_logging()
     # Run the database initialization
     db_connection.init_db_sync()
     yield

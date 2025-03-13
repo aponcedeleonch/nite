@@ -1,7 +1,7 @@
 .PHONY: install, clean, typecheck, lint, format
 
 # Default port for the web server
-PORT?=9090
+PORT?=8787
 
 install:
 	uv sync --all-groups;

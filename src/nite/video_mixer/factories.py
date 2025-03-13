@@ -4,6 +4,8 @@ from multiprocessing import Queue
 from pathlib import Path
 from typing import List, Optional, Tuple
 
+import structlog
+
 import nite.config as nite_config
 from nite.audio.audio import short_format
 from nite.audio.audio_action import (
@@ -16,7 +18,6 @@ from nite.audio.audio_action import (
 )
 from nite.audio.audio_io import AudioAnalyzerSong, AudioFormat, AudioListener
 from nite.audio.audio_processing import AudioProcessor, BPMDetector, PitchDetector
-from nite.logging import configure_module_logging
 from nite.video.video import VideoFramesPath
 from nite.video.video_io import NiteVideo, VideoStream
 from nite.video_mixer.blender import BlenderMath, BlendModes, BlendWithSong
@@ -27,7 +28,7 @@ from nite.video_mixer.streamer import (
     VideoCombinerSong,
 )
 
-logger = configure_module_logging("nite.video_mixer.factories")
+logger = structlog.get_logger("nite.video_mixer.factories")
 
 
 class InitMixerError(Exception):

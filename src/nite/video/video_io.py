@@ -5,13 +5,13 @@ from pathlib import Path
 from typing import AsyncIterator, Optional
 
 import cv2
+import structlog
 from pydantic import BaseModel
 
 from nite.config import METADATA_FILENAME, SUFFIX_NITE_VIDEO_FOLDER, VIDEO_LOCATION
-from nite.logging import configure_module_logging
 from nite.video.video import VideoFramesPath, VideoMetadata
 
-logger = configure_module_logging("nite.video_io")
+logger = structlog.get_logger("nite.video_io")
 
 
 class FramesNotFoundError(Exception):

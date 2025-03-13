@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import List, Optional, Type
 
+import structlog
 from alembic import command as alembic_command
 from alembic.config import Config as AlembicConfig
 from pydantic import BaseModel
@@ -11,9 +12,8 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from nite.api import v1_models
 from nite.db import models as db_models
-from nite.logging import configure_module_logging
 
-logger = configure_module_logging("nite.db.connection")
+logger = structlog.get_logger("nite.db.connection")
 
 
 class AlreadyExistsError(Exception):

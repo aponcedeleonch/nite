@@ -2,12 +2,12 @@ from abc import ABC, abstractmethod
 from typing import Optional
 
 import numpy as np
+import structlog
 
 from nite.config import AUDIO_SAMPLING_RATE
-from nite.logging import configure_module_logging
 from nite.video_mixer.time_recorder import TimeRecorder
 
-logger = configure_module_logging("nite.buffers")
+logger = structlog.get_logger("nite.buffers")
 
 
 class Buffer(ABC):

@@ -5,14 +5,14 @@ from typing import Any, List, Optional
 
 import librosa
 import numpy as np
+import structlog
 from pydantic import BaseModel
 
 from nite.audio.audio import AudioFormat
 from nite.config import AUDIO_SAMPLING_RATE
-from nite.logging import configure_module_logging
 from nite.video_mixer.buffers import Buffer, SampleBuffer
 
-logger = configure_module_logging("nite.audio_processing")
+logger = structlog.get_logger("nite.audio_processing")
 
 
 class ChromaIndex(int, Enum):

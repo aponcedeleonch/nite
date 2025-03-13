@@ -1,9 +1,8 @@
 import pyaudio
+import structlog
 from pydantic import BaseModel, computed_field
 
-from nite.logging import configure_module_logging
-
-logger = configure_module_logging("nite.audio")
+logger = structlog.get_logger("nite.audio")
 
 
 class AudioFormat(BaseModel):

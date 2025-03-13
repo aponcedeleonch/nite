@@ -4,12 +4,12 @@ from pathlib import Path
 from typing import List
 
 import cv2
+import structlog
 from pydantic import BaseModel, computed_field
 
 from nite.config import METADATA_FILENAME
-from nite.logging import configure_module_logging
 
-logger = configure_module_logging("nite.video")
+logger = structlog.get_logger("nite.video")
 
 
 class VideoMetadata(BaseModel):

@@ -6,15 +6,15 @@ from queue import Empty as QueueEmpty
 from typing import List
 
 import cv2
+import structlog
 
 from nite.audio.audio_action import AudioActions
 from nite.audio.audio_io import AudioListener
-from nite.logging import configure_module_logging
 from nite.video.video import VideoFramesPath
 from nite.video_mixer.blender import BlendWithSong
 from nite.video_mixer.time_recorder import TimeRecorder
 
-logger = configure_module_logging("nite.streamer")
+logger = structlog.get_logger("nite.streamer")
 
 
 class TerminateTaskGroupError(Exception):
