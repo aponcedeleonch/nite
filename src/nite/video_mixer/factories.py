@@ -300,6 +300,7 @@ class VideoCombinerFactory:
         )
         video_combiner_queue = await video_factory.get_stream_config()
         audio_listener, _ = await audio_factory.get_stream_config()
+        self.audio_listener = audio_listener
         return VideoCombinerAudioListenerQueue(
             video_combiner_queue=video_combiner_queue,
             audio_listener=audio_listener,
