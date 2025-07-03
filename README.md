@@ -44,3 +44,12 @@ Example run:
 ```sh
 nite_video_mixer --video-1 ../GG-ANIMATED_3.mp4 --video-2 ../GG-ANIMATED_7.mp4 --alpha ../ALPHA1.mp4 --bpm-frequency kick --blend-operation darken --blend-falloff 0.5 stream --playback-time-sec 5
 ```
+
+### Raspberry PI related commands:
+
+To make the video mixer run on startup setup the nite-startup.service with following commands:
+```
+sudo systemctl daemon-reload
+sudo systemctl enable nite-startup.service
+sudo systemctl start nite-startup.service
+```

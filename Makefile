@@ -4,9 +4,6 @@
 PORT?=8787
 
 install:
-	sudo apt-get update && sudo apt-get upgrade -y; \
-	sudo apt-get install -y libportaudio2 libportaudiocpp0 portaudio19-dev; \
-	curl -LsSf https://astral.sh/uv/install.sh | sh; \
 	uv sync --all-groups;
 
 clean:

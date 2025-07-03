@@ -1,0 +1,14 @@
+[Unit]
+Description=Nite video mixer on boot
+After=network.target
+
+[Service]
+Type=simple
+User=nite
+Environment=DISPLAY=:0
+ExecStart=/home/nite/nite/setup-and-run.sh
+WorkingDirectory=/home/nite/nite
+Restart=on-failure
+
+[Install]
+WantedBy=graphical.target
