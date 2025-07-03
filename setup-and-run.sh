@@ -23,6 +23,9 @@ cd "$HOME/nite"
 # 3) Sync & any other uv setup
 make install >> "$LOGFILE" 2>&1
 
+# 3.5) Activate environment created by uv
+source .venv/bin/activate
+
 # 4) Launch the mixer & force it fullscreen
 nite_video_mixer \
   --video-1 ../GG-ANIMATED_3.mp4 \
